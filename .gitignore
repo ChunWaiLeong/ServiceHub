@@ -43,3 +43,23 @@ bld/
 msbuild.log
 msbuild.err
 msbuild.wrn
+
+# Frontend output
+node_modules/
+.pnpm-store/
+dist/
+*.tsbuildinfo
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+appsettings.Local.json
+appsettings.*.Local.json
+*.pfx
+*.pem
+
+# Test output
+TestResults/
+coverage/
+*.log

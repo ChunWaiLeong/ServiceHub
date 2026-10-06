@@ -1,0 +1,42 @@
+:root { font-family: Inter, system-ui, sans-serif; color: #20332e; background: #fafbf8; }
+body { margin: 0; color: #20332e; background: #fafbf8; }
+.app-shell { min-height: 100vh; display: flex; flex-direction: column; }
+.container { max-width: 1160px; }
+.site-header { border-bottom: 1px solid #e5e9e2; background: #fff; }
+.navbar { min-height: 88px; padding-inline: 12px; }
+.navbar-brand { font-size: 1.4rem; font-weight: 750; color: #193d35; letter-spacing: -.04em; }
+.brand-mark { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; width: 39px; height: 39px; border-radius: 12px; background: #193d35; color: white; font-size: 1.5rem; }
+.brand-mark span { color: #a6cfb0; }
+.nav-link { color: #4a5954; font-size: .94rem; }
+.nav-link.active { color: #193d35; font-weight: 700; }
+.btn { border-radius: 8px; font-weight: 600; padding: .65rem 1.2rem; }
+.btn-primary { --bs-btn-bg: #193d35; --bs-btn-border-color: #193d35; --bs-btn-hover-bg: #2b594d; --bs-btn-hover-border-color: #2b594d; --bs-btn-active-bg: #2b594d; --bs-btn-active-border-color: #2b594d; }
+.btn-outline-primary { --bs-btn-color: #193d35; --bs-btn-border-color: #193d35; --bs-btn-hover-bg: #193d35; --bs-btn-hover-border-color: #193d35; --bs-btn-active-bg: #193d35; --bs-btn-active-border-color: #193d35; }
+.btn-link { color: #193d35; }
+.hero { --bs-gutter-x: 1.5rem; padding: 78px 0 65px; }
+.eyebrow { font-size: .73rem; font-weight: 750; letter-spacing: .11em; text-transform: uppercase; color: #547365; margin-bottom: 18px; }
+h1 { font-size: clamp(2.6rem, 5vw, 4.2rem); line-height: 1.08; font-weight: 700; letter-spacing: -.055em; }
+h1 span { color: #59866e; }
+.hero-description { max-width: 530px; margin: 24px 0 28px; font-size: 1.08rem; line-height: 1.8; color: #63716a; }
+.intro-panel { background: #eaf0e5; border-radius: 24px; padding: 32px; min-height: 350px; position: relative; overflow: hidden; }
+.panel-label { font-size: .65rem; letter-spacing: .13em; font-weight: 750; color: #4f6a58; }
+.illustration { display: grid; place-items: center; height: 180px; }
+.illustration span { display: grid; place-items: center; width: 125px; height: 125px; border-radius: 32px; transform: rotate(-9deg); background: #193d35; color: #eaf0e5; font-size: 3.2rem; font-weight: 750; letter-spacing: -.08em; box-shadow: 16px 16px 0 #cfdebd; }
+.intro-panel h2 { font-size: 1.5rem; font-weight: 650; letter-spacing: -.04em; }
+.intro-panel p { color: #5e715f; font-size: .95rem; }
+.badge { background: #f5f7ed; color: #486442; font-weight: 550; padding: .6rem .9rem; }
+.features { border-top: 1px solid #e0e6dc; padding: 36px 0 65px; }
+.features .eyebrow { margin-bottom: 10px; }
+.features h2 { font-size: 1.75rem; letter-spacing: -.04em; }
+.feature-card { border: 1px solid #e3e8df; background: #fff; border-radius: 14px; padding: 24px; }
+.feature-number { color: #65826d; font-size: .8rem; font-weight: 700; }
+.feature-card h3 { font-size: 1.12rem; margin: 18px 0 12px; }
+.feature-card p { font-size: .94rem; line-height: 1.7; color: #68736c; margin: 0; }
+.site-footer { padding: 24px 0; border-top: 1px solid #e0e6dc; font-size: .85rem; background: #fff; }
+.api-status { color: #63716a; font-size: .8rem; }
+.status-dot { width: 7px; height: 7px; border-radius: 50%; background: #89928b; }
+.status-dot.connected { background: #35805a; }
+.status-dot.unavailable { background: #bd7439; }
+.placeholder-page { max-width: 740px; padding: 90px 0; }
+.skip-link:focus { display: block; padding: 12px; background: white; }
+@media (max-width: 767px) { .navbar { min-height: 72px; } .navbar-nav { padding: 16px 0; gap: 12px; align-items: flex-start; } .hero { padding: 42px 0; } .intro-panel { min-height: auto; } .features { padding-bottom: 40px; } }
