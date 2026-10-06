@@ -1,8 +1,10 @@
 using Microsoft.EntityFrameworkCore;
 using ServiceHub.Api.Data;
 using ServiceHub.Api.ErrorHandling;
+using ServiceHub.Api.Data.Seeding;
 
-var builder = WebApplication.CreateBuilder(args);
+var seedDevelopment = args.Contains("--seed-development", StringComparer.Ordinal);
+var builder = WebApplication.CreateBuilder(args.Where(arg => arg != "--seed-development").ToArray());
 
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
@@ -35,6 +37,20 @@ builder.Services.AddCors(options => options.AddPolicy("Frontend", policy =>
 }));
 
 var app = builder.Build();
+
+if (seedDevelopment)
+{
+    if (!app.Environment.IsDevelopment())
+    {
+        throw new InvalidOperationException("Development seeding is only allowed in Development.");
+    }
+
+    await using var scope = app.Services.CreateAsyncScope();
+    var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    await DevelopmentDataSeeder.SeedAsync(context, app.Lifetime.ApplicationStopping);
+    app.Logger.LogInformation("Development categories seeded.");
+    return;
+}
 
 app.UseExceptionHandler();
 app.UseStatusCodePages();
