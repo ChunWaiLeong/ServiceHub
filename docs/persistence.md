@@ -1,5 +1,7 @@
 # Phase 2 persistence design
 
+This document records Phase 2 storage decisions. Phase 3 now configures Identity/JWT and role seeding using this schema; see [authentication design](authentication.md). The initial migration is applied locally and all PostgreSQL tests pass. Verification limits below describe the original Phase 2 run, not the current project state.
+
 ## Scope
 
 This phase defines storage and migrations only. No authentication configuration, JWT/refresh tokens, user registration, business endpoints, booking creation/status workflows, slot generation, overlap constraint, admin interface, or frontend feature pages are implemented.

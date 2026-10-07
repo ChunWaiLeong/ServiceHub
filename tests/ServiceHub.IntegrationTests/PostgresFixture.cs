@@ -22,14 +22,19 @@ public sealed class PostgresFixture : IAsyncLifetime
     private readonly string schema = "servicehub_test_" + Guid.NewGuid().ToString("N");
     private bool schemaCreated;
 
-    public ApplicationDbContext CreateContext()
+    public string GetConnectionString()
     {
         if (string.IsNullOrWhiteSpace(connectionString))
             throw new InvalidOperationException("PostgreSQL test database is not configured.");
 
         var testConnection = new NpgsqlConnectionStringBuilder(connectionString) { SearchPath = schema };
+        return testConnection.ConnectionString;
+    }
+
+    public ApplicationDbContext CreateContext()
+    {
         return new ApplicationDbContext(new DbContextOptionsBuilder<ApplicationDbContext>()
-            .UseNpgsql(testConnection.ConnectionString).Options);
+            .UseNpgsql(GetConnectionString()).Options);
     }
 
     public async Task InitializeAsync()

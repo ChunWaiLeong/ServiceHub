@@ -19,6 +19,7 @@ public sealed class FoundationTests : IClassFixture<WebApplicationFactory<Progra
         client = factory.WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Development");
+            TestAuthConfiguration.Configure(builder);
             builder.ConfigureAppConfiguration((_, configuration) =>
                 configuration.AddInMemoryCollection(new Dictionary<string, string?>
                 {
@@ -78,6 +79,7 @@ public sealed class FoundationTests : IClassFixture<WebApplicationFactory<Progra
         await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Development");
+            TestAuthConfiguration.Configure(builder);
             builder.ConfigureServices(services => services.AddControllers()
                 .AddApplicationPart(typeof(FailingTestController).Assembly));
         });

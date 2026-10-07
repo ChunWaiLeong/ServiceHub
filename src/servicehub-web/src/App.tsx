@@ -1,10 +1,18 @@
 import { useState } from 'react'
-import { Link, NavLink, Route, Routes } from 'react-router-dom'
+import { Link, NavLink, Route, Routes, useNavigate } from 'react-router-dom'
 import ApiStatus from './components/ApiStatus'
 import HomePage from './pages/HomePage'
 import PlaceholderPage from './pages/PlaceholderPage'
+import LoginPage from './pages/LoginPage'
+import RegisterPage from './pages/RegisterPage'
+import AccountPage from './pages/AccountPage'
+import BusinessDashboardPage from './pages/BusinessDashboardPage'
+import ProtectedRoute from './auth/ProtectedRoute'
+import { useAuth } from './auth/AuthContext'
 
 export default function App() {
+  const { user, isAuthenticated, logout } = useAuth()
+  const navigate = useNavigate()
   const [menuOpen, setMenuOpen] = useState(false)
   const closeMenu = () => setMenuOpen(false)
 
@@ -21,8 +29,14 @@ export default function App() {
           <div className={`collapse navbar-collapse ${menuOpen ? 'show' : ''}`} id="main-navigation">
             <div className="navbar-nav ms-auto align-items-md-center gap-md-4">
               <NavLink className="nav-link" to="/browse" onClick={closeMenu}>Browse Services</NavLink>
-              <NavLink className="nav-link" to="/login" onClick={closeMenu}>Login</NavLink>
-              <NavLink className="btn btn-outline-primary" to="/register" onClick={closeMenu}>Register</NavLink>
+              {isAuthenticated ? <>
+                {user?.role === 'BusinessOwner' && <NavLink className="nav-link" to="/business/dashboard" onClick={closeMenu}>Business Dashboard</NavLink>}
+                <NavLink className="nav-link" to="/account" onClick={closeMenu}>Account</NavLink>
+                <button className="btn btn-outline-primary" onClick={() => { logout(); closeMenu(); navigate('/login') }}>Logout</button>
+              </> : <>
+                <NavLink className="nav-link" to="/login" onClick={closeMenu}>Login</NavLink>
+                <NavLink className="btn btn-outline-primary" to="/register" onClick={closeMenu}>Register</NavLink>
+              </>}
             </div>
           </div>
         </nav>
@@ -31,9 +45,11 @@ export default function App() {
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/browse" element={<PlaceholderPage title="Discover your next favourite service." description="Business discovery and service browsing are on the way." />} />
-          <Route path="/login" element={<PlaceholderPage title="Welcome back." description="Secure account access will arrive in the authentication phase." />} />
-          <Route path="/register" element={<PlaceholderPage title="Your ServiceHub journey starts here." description="Customer and business owner registration is coming soon." />} />
-          <Route path="*" element={<PlaceholderPage title="Page not found." description="We couldn’t find the page you’re looking for." />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+          <Route element={<ProtectedRoute />}><Route path="/account" element={<AccountPage />} /></Route>
+          <Route element={<ProtectedRoute role="BusinessOwner" />}><Route path="/business/dashboard" element={<BusinessDashboardPage />} /></Route>
+          <Route path="*" element={<PlaceholderPage title="Page not found." description="We couldnâ€™t find the page youâ€™re looking for." />} />
         </Routes>
       </main>
       <footer className="site-footer"><div className="container d-flex flex-wrap justify-content-between gap-3">

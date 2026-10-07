@@ -1,92 +1,88 @@
 # ServiceHub
 
-ServiceHub is a portfolio project for an appointment and service-booking platform. The intended product will let customers discover businesses and manage appointments, while business owners manage their profiles, services, availability, and bookings.
+ServiceHub is a portfolio appointment and service-booking platform built incrementally with React, ASP.NET Core and PostgreSQL.
 
-## Current status — Phase 2 persistence model
+## Current status — Phase 3 authentication
 
-Implemented:
+Implemented: .NET 10 controller API, health/Swagger/ProblemDetails, EF Core PostgreSQL persistence, Identity registration/login, JWT authentication, role authorization, React authentication forms, account page and a protected owner dashboard placeholder.
 
-- A single .NET 10 ASP.NET Core API project with controller-based routing.
-- `GET /api/health`, returning `{ "application": "ServiceHub API", "status": "Healthy" }`.
-- Development Swagger UI and OpenAPI documentation.
-- Central ProblemDetails exception handling, safe error responses, and console logging.
-- EF Core with PostgreSQL, seven ServiceHub entities, explicit Fluent API mappings, and the first active migration.
-- Identity-compatible user storage only (authentication is not configured).
-- An opt-in development category seeder and PostgreSQL persistence tests.
-- React, TypeScript, Vite, and Bootstrap application shell with responsive navigation.
-- Home page and explicitly labelled Browse Services, Login, and Register placeholders.
-- Live API connectivity status, timeout handling, and a retry action.
-- Six API integration tests and six PostgreSQL-provider model/migration checks.
-- Opt-in PostgreSQL tests for relationships, constraints, timestamps, snapshots, deletion protection, and seeding.
-
-Authentication, JWT, business APIs, booking workflows, availability calculation, admin features, CI/CD, and deployment are not implemented. PostgreSQL migration application is pending local database setup. The health endpoint checks API liveness only; it does not check PostgreSQL.
+Business/service management, availability, booking workflows, admin management, refresh tokens, password reset, email verification, MFA, CI/CD and deployment are deferred. Domain tables exist; their workflows do not.
 
 ## Architecture
 
 ```text
-React + TypeScript
-        | REST / JSON
+React + TypeScript + Vite + Bootstrap
+             | REST / JSON / Bearer token
 ASP.NET Core API controllers
-        | Application services (introduced with domain features)
-EF Core ApplicationDbContext
-        | PostgreSQL (schema defined; configure and apply migration locally)
+             | AuthService / JwtTokenService
+ASP.NET Core Identity / EF Core ApplicationDbContext
+             | PostgreSQL
 ```
 
-The backend uses one project with folders for responsibilities. Controllers handle HTTP; future application services will enforce business rules and use EF Core directly. No MediatR, CQRS handlers, Dapper, repository wrappers, Keycloak, domain events, outbox, or Quartz is used.
+One backend project uses explicit services and EF Core directly. No MediatR, CQRS handlers, generic repositories, UnitOfWork, Dapper, Keycloak, domain events, outbox or Quartz.
 
 ```text
-src/
-  ServiceHub.Api/
-    Controllers/
-    Contracts/
-    Data/
-      Configurations/
-      Migrations/
-      Seeding/
-    Models/
-    ErrorHandling/
-    Properties/
-    Program.cs
-  servicehub-web/
-    src/
-      api/
-      components/
-      pages/
-      styles/
-tests/
-  ServiceHub.IntegrationTests/
-docs/
-  legacy/GoVilla.Migrations/
+src/ServiceHub.Api/
+  Authentication/ Configuration/ Controllers/ Contracts/Auth/
+  Services/ Data/Configurations/ Data/Migrations/ Data/Seeding/
+  Models/ ErrorHandling/ Properties/ Program.cs
+src/servicehub-web/src/
+  api/ auth/ components/ pages/ styles/
+tests/ServiceHub.IntegrationTests/
+docs/authentication.md
+docs/persistence.md
+docs/legacy/GoVilla.Migrations/
 ```
 
-## Required tools
+## Development tools
 
-- .NET 10 SDK (stable). `global.json` accepts installed .NET 10 feature bands starting at 10.0.100.
-- Node.js 22.12 or newer supported LTS; Node.js 24 was used for verification.
-- pnpm 11.19.0, matching `packageManager` in the frontend package manifest.
-- Git.
-- PostgreSQL 16 or later is recommended for local development and persistence tests. PostgreSQL must be installed/running separately; this repository does not provision it. API health and the frontend shell still run without it.
+- .NET 10 SDK; global.json accepts feature bands starting at 10.0.100.
+- Node.js 22.12 or newer supported LTS; Node.js 24 used for verification.
+- pnpm 11.19.0 (`npm install --global pnpm@11.19.0` if needed).
+- PostgreSQL 16 or later recommended, running separately; Git.
 
-If pnpm is not installed, install it using `npm install --global pnpm@11.19.0`.
+## Configuration and local startup
 
-## Run the backend
+Run commands from the repository root. ASP.NET Core reads appsettings, Development user secrets and environment variables. The backend does **not** automatically read root `.env.local`. Changed Windows user variables require a new terminal/process.
 
-From the repository root:
+Configure the development connection string securely. For example, use .NET user secrets (replace placeholders locally):
+
+```powershell
+dotnet user-secrets set "ConnectionStrings:Database" "Host=localhost;Port=5432;Database=servicehub;Username=<local-user>;Password=<local-password>" --project src/ServiceHub.Api
+
+# Generate once; never paste the key into source control or chat.
+$serviceHubJwtKey = [Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
+dotnet user-secrets set "Jwt:Key" $serviceHubJwtKey --project src/ServiceHub.Api
+Remove-Variable serviceHubJwtKey
+```
+
+User secrets live outside the repository; they are a development convenience, not encrypted production storage. Environment variables can supply the same settings:
+
+| Variable | Purpose/default |
+| --- | --- |
+| ConnectionStrings__Database | Required for database-backed functionality |
+| Jwt__Key | Required Base64 random key, at least 32 decoded bytes; no default |
+| Jwt__Issuer | ServiceHub.Api |
+| Jwt__Audience | ServiceHub.Web |
+| Jwt__ExpirationMinutes | 30; accepted range 1–60 |
+| Cors__AllowedOrigins__0 | http://localhost:5173 in Development |
+| SERVICEHUB_TEST_DATABASE | Dedicated PostgreSQL test database connection string |
+
+A missing/invalid JWT key fails API startup. Health checks liveness, not PostgreSQL. No automatic startup migrations or seeding.
 
 ```powershell
 dotnet restore ServiceHub.sln
+dotnet tool restore
+dotnet ef database update --project src/ServiceHub.Api
+dotnet run --project src/ServiceHub.Api -- --seed-roles
+# Optional development categories:
+dotnet run --project src/ServiceHub.Api -- --seed-development
 dotnet run --project src/ServiceHub.Api
 ```
 
-The launch profile uses Development and `http://localhost:5080`.
+Use the existing ServiceHub database; do not reset it. Initial migration: `20261006142457_InitialServiceHub`. Phase 3 requires no new migration: Phase 2 already included Identity tables. Role seeding is explicit and idempotent, creates Customer/BusinessOwner/Admin, and creates no admin account. Category seeding is Development-only.
 
-- Health: http://localhost:5080/api/health
-- Swagger UI: http://localhost:5080/swagger
-- OpenAPI: http://localhost:5080/swagger/v1/swagger.json
-
-Local development uses HTTP to avoid certificate setup. Outside Development, HTTPS redirection and HSTS are enabled, and Swagger is disabled. Production hosting configuration is deferred.
-
-## Run the frontend
+Development serves http://localhost:5080. Health: `/api/health`; Swagger: `/swagger`; OpenAPI: `/swagger/v1/swagger.json`. Local HTTP avoids certificate setup. Outside Development, HTTPS redirection/HSTS are enabled and Swagger is disabled. Public hosting is deferred.
 
 In a second terminal:
 
@@ -96,133 +92,48 @@ pnpm install
 pnpm dev
 ```
 
-Open http://localhost:5173. With the backend running, the footer displays **API connected**. If the API is stopped or unreachable, it displays **API unavailable** with a retry action.
+Open http://localhost:5173 (the exact hostname allowed by CORS). Vite uses a strict port. Optional frontend `.env.local`: `VITE_API_BASE_URL=http://localhost:5080`. Restart Vite after changing it. VITE_ values are public and must contain no secrets. Environment files, generated output and test results are Git-ignored.
 
-Vite uses a strict port so it will not silently switch to an origin that the API has not allowed. Stop any other process using port 5173 before starting it.
+## Authentication
 
-The frontend makes a direct browser request to the backend; local CORS allows `http://localhost:5173`. Open that exact hostname rather than `127.0.0.1`, unless you also configure that origin.
+| Endpoint | Access/result |
+| --- | --- |
+| POST /api/auth/register | Public; Customer/BusinessOwner only; 201, then log in separately |
+| POST /api/auth/login | Public; 200 token/expiration/user DTO; generic 401 on invalid credentials |
+| GET /api/auth/me | Authenticated; current user from JWT claims |
+| GET /api/auth/business-owner | BusinessOwner only; permission demonstration, no business management |
 
-## Configuration and secrets
+Registration takes firstName, lastName, email, password and role. Login takes email/password. Identity owns hashing, normalization and credential verification. Passwords require at least 12 characters plus uppercase, lowercase, digit and symbol. Five failed attempts lock an account for 15 minutes. Public Admin registration is rejected.
 
-ASP.NET Core loads `appsettings.json`, environment-specific appsettings, and environment variables. Nested environment keys use double underscores.
+AuthContext holds the token **in memory only**. Login updates navigation; `/account` requires authentication and `/business/dashboard` requires BusinessOwner. Logout/expiry clear state; page refresh requires another login. There is no stateless API logout endpoint: issued tokens remain valid until expiration. No browser storage, refresh cookies or refresh tokens. Memory storage reduces persistent exposure but does not protect against malicious JavaScript/XSS.
 
-Database configuration is required for migration application, seeding, and persistence tests. API health still works without it. Set a connection string in your terminal or development environment:
+See [authentication design](docs/authentication.md) for flow and security trade-offs.
 
-```powershell
-$env:ConnectionStrings__Database = 'Host=localhost;Port=5432;Database=servicehub;Username=<your-user>;Password=<your-local-password>'
-dotnet run --project src/ServiceHub.Api
-```
+## Database and tests
 
-The example contains placeholders only. Keep real credentials out of source control. The API registers the PostgreSQL context lazily and gives a configuration error if database functionality is requested without a connection string. It does not connect, seed data, or apply migrations at startup.
-
-To override the allowed frontend origin:
-
-```powershell
-$env:Cors__AllowedOrigins__0 = 'http://localhost:5173'
-```
-
-For the frontend, optionally copy `.env.example` to `.env.local` and set:
-
-```dotenv
-VITE_API_BASE_URL=http://localhost:5080
-```
-
-The default is already `http://localhost:5080`. Restart Vite after changing environment variables. `VITE_` values are public browser configuration and must never contain secrets. Local environment files, certificates, package output, and test results are ignored by Git. No dotenv loader is installed in the backend; use environment variables there.
-
-## Build and test
-
-From the root:
+See [persistence design](docs/persistence.md) for ApplicationUser, Business, BusinessCategory, Service, BusinessWorkingHours, BusinessBlockedPeriod and Booking mappings. Booking snapshots preserve history; ServiceHub foreign keys restrict deletion. Working hours use local recurring times; appointments use UTC and half-open intervals `[start, end)`. Overlap protection is deferred.
 
 ```powershell
 dotnet build ServiceHub.sln
+# Configure SERVICEHUB_TEST_DATABASE securely first:
 dotnet test ServiceHub.sln
+dotnet ef migrations has-pending-model-changes --project src/ServiceHub.Api
+dotnet ef migrations script --project src/ServiceHub.Api
 ```
 
-Frontend:
+Frontend production build:
 
 ```powershell
 cd src/servicehub-web
 pnpm build
 ```
 
-`pnpm build` checks TypeScript and produces `dist/`. Commit `pnpm-lock.yaml` for reproducible dependency resolution. The pnpm build policy permits only esbuild's required install script.
+The dedicated test database role needs create/drop schema permissions. Fixtures apply the actual migration in random schemas and drop only those schemas. Persistence cases roll back transactions; HTTP cases write only to their isolated schema. Interrupted runs can leave schemas for manual cleanup. Never point tests at production.
 
-The integration tests run the real ASP.NET Core request pipeline in memory and cover:
+Without SERVICEHUB_TEST_DATABASE, PostgreSQL tests explicitly skip; invalid configured connections fail. Model/SQL checks do not replace database tests. Phase 3 verification: **47 passed, 0 failed, 0 skipped**, including existing persistence checks and the actual JWT pipeline. Backend/frontend builds pass. Browser checks verified both registration types, login, /me, owner authorization, protected navigation and logout. Two demo accounts were created in the development database during verification.
 
-- Health response without database configuration.
-- Allowed local CORS origin.
-- Rejection of an unconfigured CORS origin.
-- ProblemDetails for unknown routes.
-- OpenAPI health documentation.
-- Safe ProblemDetails for unexpected exceptions without leaking exception details.
+## Legacy transition and licence
 
-Phase 2 verification: backend and frontend builds pass; 12 tests pass. Eleven PostgreSQL test methods are explicitly skipped because no PostgreSQL instance or test connection string was available. The parameterized PostgreSQL methods expand into additional cases when configured. Migration generation and provider-specific SQL generation pass, but these do not establish that the migration has been applied to a live database.
+Old GoVilla projects and rental/architecture tests were retired in Phase 1. Archived migrations in docs/legacy/GoVilla.Migrations are historical references only, outside active migration history. Do not apply them to ServiceHub. No old architecture was reintroduced.
 
-## Database model and migrations
-
-See [the persistence design](docs/persistence.md) for fields, constraints, relationships, time rules, and the Identity storage decision.
-
-| Entity | Purpose |
-| --- | --- |
-| ApplicationUser | Identity-compatible Guid user key, names, active status, creation timestamp |
-| BusinessCategory | Unique category name |
-| Business | One owner, one category, profile details, time-zone ID, active status, timestamps |
-| Service | Business membership, price/currency/duration, active status, timestamps |
-| BusinessWorkingHours | Multiple local recurring time intervals per day |
-| BusinessBlockedPeriod | UTC closure interval and optional reason |
-| Booking | Customer/business/service references, UTC interval/status, historical service snapshots |
-
-Install or use a PostgreSQL server and create a new `servicehub` database with your own local role. That role must be able to create tables and indexes. Do not reuse the archived GoVilla schema. No credentials or database instance are provisioned by the repository.
-
-From the repository root, after setting `ConnectionStrings__Database`:
-
-```powershell
-dotnet tool restore
-dotnet ef database update --project src/ServiceHub.Api
-```
-
-The checked-in `dotnet-tools.json` pins the EF CLI to 10.0.4. It matches the EF Core design package. The design-time factory permits metadata-only commands without credentials; it never supplies a password or connects during migration generation.
-
-Useful commands:
-
-```powershell
-# Generate a SQL script for review; does not require PostgreSQL.
-dotnet ef migrations script --project src/ServiceHub.Api
-
-# Check that the current model matches the snapshot.
-dotnet ef migrations has-pending-model-changes --project src/ServiceHub.Api
-
-# For a future approved model change; do not recreate InitialServiceHub.
-dotnet ef migrations add <MigrationName> --project src/ServiceHub.Api --output-dir Data/Migrations
-```
-
-After applying the migration, optionally seed five development categories:
-
-```powershell
-dotnet run --project src/ServiceHub.Api -- --seed-development
-```
-
-This command uses the Development launch profile, inserts missing categories, and exits. It is rejected outside Development. It does not apply migrations, start the API, seed users, create roles, or create businesses/bookings. Categories are not inserted by the migration and normal API startup does not seed anything.
-
-### PostgreSQL persistence tests
-
-Create a separate empty `servicehub_tests` database with a local role that can create/drop schemas and their objects. Supply your actual credentials only in the terminal:
-
-```powershell
-$env:SERVICEHUB_TEST_DATABASE = 'Host=localhost;Port=5432;Database=servicehub_tests;Username=<your-test-user>;Password=<your-test-password>'
-dotnet test ServiceHub.sln
-```
-
-The fixture creates one randomly named schema, applies the actual migration there, runs each test inside a transaction that rolls back, and drops only its own schema at the end. It never drops the database. Use a dedicated test database, not an application/production database. An interrupted test run may leave a `servicehub_test_...` schema for manual cleanup.
-
-Without this variable, PostgreSQL tests report explicit skips. If it is configured but unreachable, the tests fail rather than silently skipping. The six provider model checks run without a server and inspect the Npgsql relational model and generated migration SQL; they are not substitutes for live PostgreSQL tests.
-
-## Legacy transition
-
-The four GoVilla backend projects and three legacy test projects were retired after the new foundation built successfully. Rental-domain tests and MediatR/DDD architecture tests no longer describe this application's behavior, so they were replaced with foundation integration checks. The old Docker/Keycloak configuration and CQRS illustration were also removed.
-
-The original migration, designer, and model snapshot are preserved in `docs/legacy/GoVilla.Migrations` as historical reference. They are not part of the solution, do not compile, and must not be applied to a ServiceHub database. The first active ServiceHub migration is `20261006142457_InitialServiceHub`, under `src/ServiceHub.Api/Data/Migrations`. Apply it to a new dedicated ServiceHub database; migrating old GoVilla data is outside this phase. No existing database has been changed.
-
-## Acknowledgements and licence
-
-The starting repository was adapted from [kmorpex/booking-service](https://github.com/kmorpex/booking-service). Its original code is distributed under the MIT License, copyright (c) 2024 Konstantin Fedorov. The original `LICENSE` is preserved unchanged. ServiceHub is being redesigned incrementally as an independent portfolio application.
+Adapted from [kmorpex/booking-service](https://github.com/kmorpex/booking-service), MIT License, copyright (c) 2024 Konstantin Fedorov. Original LICENSE is preserved unchanged.
