@@ -1,5 +1,7 @@
 # Phase 3 authentication design
 
+This records the authentication foundation. Phase 4 now adds business/service management using these handlers; see [business management](business-management.md). Authentication storage and token behavior remain unchanged.
+
 ## Flow
 
 Registration form → API client → AuthController → AuthService → Identity UserManager → EF Core/PostgreSQL. Registration accepts only Customer or BusinessOwner. Identity normalizes email and hashes passwords. Account creation and role assignment share a database transaction. A 201 response asks the user to log in separately, keeping registration and session creation explicit.

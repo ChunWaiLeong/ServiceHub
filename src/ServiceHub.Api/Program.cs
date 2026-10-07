@@ -54,6 +54,8 @@ builder.Services.AddOptions<JwtOptions>().BindConfiguration(JwtOptions.SectionNa
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<JwtTokenService>();
 builder.Services.AddScoped<AuthService>();
+builder.Services.AddScoped<BusinessService>();
+builder.Services.AddScoped<ServiceManagementService>();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer();
 builder.Services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
     .Configure<IOptions<JwtOptions>>((options, jwt) =>

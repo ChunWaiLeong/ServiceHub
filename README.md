@@ -2,11 +2,11 @@
 
 ServiceHub is a portfolio appointment and service-booking platform built incrementally with React, ASP.NET Core and PostgreSQL.
 
-## Current status — Phase 3 authentication
+## Current status — Phase 4 business profiles and services
 
-Implemented: .NET 10 controller API, health/Swagger/ProblemDetails, EF Core PostgreSQL persistence, Identity registration/login, JWT authentication, role authorization, React authentication forms, account page and a protected owner dashboard placeholder.
+Implemented: .NET 10 controller API, health/Swagger/ProblemDetails, EF Core PostgreSQL persistence, Identity/JWT authentication and role authorization, React authentication/account pages, business profile creation/editing, owner service management, public business discovery and public profiles with active services.
 
-Business/service management, availability, booking workflows, admin management, refresh tokens, password reset, email verification, MFA, CI/CD and deployment are deferred. Domain tables exist; their workflows do not.
+Availability, scheduling, appointment booking, reviews, payments, admin management, refresh tokens, password reset, email verification, MFA, CI/CD and deployment are deferred. Availability and booking tables exist; their workflows do not.
 
 ## Architecture
 
@@ -14,7 +14,7 @@ Business/service management, availability, booking workflows, admin management, 
 React + TypeScript + Vite + Bootstrap
              | REST / JSON / Bearer token
 ASP.NET Core API controllers
-             | AuthService / JwtTokenService
+             | Application services / Identity token service
 ASP.NET Core Identity / EF Core ApplicationDbContext
              | PostgreSQL
 ```
@@ -24,12 +24,14 @@ One backend project uses explicit services and EF Core directly. No MediatR, CQR
 ```text
 src/ServiceHub.Api/
   Authentication/ Configuration/ Controllers/ Contracts/Auth/
-  Services/ Data/Configurations/ Data/Migrations/ Data/Seeding/
+  Services/ Contracts/Businesses/ Contracts/Services/
+  Data/Configurations/ Data/Migrations/ Data/Seeding/
   Models/ ErrorHandling/ Properties/ Program.cs
 src/servicehub-web/src/
   api/ auth/ components/ pages/ styles/
 tests/ServiceHub.IntegrationTests/
 docs/authentication.md
+docs/business-management.md
 docs/persistence.md
 docs/legacy/GoVilla.Migrations/
 ```
@@ -80,7 +82,7 @@ dotnet run --project src/ServiceHub.Api -- --seed-development
 dotnet run --project src/ServiceHub.Api
 ```
 
-Use the existing ServiceHub database; do not reset it. Initial migration: `20261006142457_InitialServiceHub`. Phase 3 requires no new migration: Phase 2 already included Identity tables. Role seeding is explicit and idempotent, creates Customer/BusinessOwner/Admin, and creates no admin account. Category seeding is Development-only.
+Use the existing ServiceHub database; do not reset it. Initial migration: `20261006142457_InitialServiceHub`. Phases 3 and 4 require no new migration: Phase 2 already included Identity and the business/service fields. Role seeding is explicit and idempotent, creates Customer/BusinessOwner/Admin, and creates no admin account. Category seeding is Development-only.
 
 Development serves http://localhost:5080. Health: `/api/health`; Swagger: `/swagger`; OpenAPI: `/swagger/v1/swagger.json`. Local HTTP avoids certificate setup. Outside Development, HTTPS redirection/HSTS are enabled and Swagger is disabled. Public hosting is deferred.
 
@@ -109,6 +111,16 @@ AuthContext holds the token **in memory only**. Login updates navigation; `/acco
 
 See [authentication design](docs/authentication.md) for flow and security trade-offs.
 
+## Business profiles and services
+
+BusinessOwners use `/business/dashboard` to create their one business, edit details and manage services. Public visitors and Customers use `/browse` and `/businesses/:id` without requiring login. Categories and Australian time-zone options come from the API.
+
+Owners are always identified through authenticated claims. Requests do not control ownership, creation status or timestamps. Customer/Admin roles cannot use owner management endpoints. Another owner's resources return 404. Services are deactivated/reactivated, never hard-deleted; public responses show only active businesses and active services.
+
+AUD is the only supported currency. Service prices must be positive with at most two decimal places; durations must be whole minutes between 1 and 480. Business profiles require an existing category and a supported IANA time-zone ID. No availability or time conversion is implemented.
+
+See [business/service API and demo guide](docs/business-management.md) for endpoints and workflow.
+
 ## Database and tests
 
 See [persistence design](docs/persistence.md) for ApplicationUser, Business, BusinessCategory, Service, BusinessWorkingHours, BusinessBlockedPeriod and Booking mappings. Booking snapshots preserve history; ServiceHub foreign keys restrict deletion. Working hours use local recurring times; appointments use UTC and half-open intervals `[start, end)`. Overlap protection is deferred.
@@ -130,7 +142,7 @@ pnpm build
 
 The dedicated test database role needs create/drop schema permissions. Fixtures apply the actual migration in random schemas and drop only those schemas. Persistence cases roll back transactions; HTTP cases write only to their isolated schema. Interrupted runs can leave schemas for manual cleanup. Never point tests at production.
 
-Without SERVICEHUB_TEST_DATABASE, PostgreSQL tests explicitly skip; invalid configured connections fail. Model/SQL checks do not replace database tests. Phase 3 verification: **47 passed, 0 failed, 0 skipped**, including existing persistence checks and the actual JWT pipeline. Backend/frontend builds pass. Browser checks verified both registration types, login, /me, owner authorization, protected navigation and logout. Two demo accounts were created in the development database during verification.
+Without SERVICEHUB_TEST_DATABASE, PostgreSQL tests explicitly skip; invalid configured connections fail. Model/SQL checks do not replace database tests. Phase 4 verification: **75 passed, 0 failed, 0 skipped**. All 47 previous checks remain, plus 28 business/service cases covering ownership, forged fields, unique-owner conflicts, validation, public filtering/paging and service status. Backend/frontend builds pass. Browser checks verified profile creation/editing, service creation/editing/deactivation, public search/category filtering, public details, Customer navigation and mobile layouts. A demo business and two services were added to the existing development database; one service is inactive. No database reset was performed.
 
 ## Legacy transition and licence
 

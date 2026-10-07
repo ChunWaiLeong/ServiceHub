@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { Link, NavLink, Route, Routes, useNavigate } from 'react-router-dom'
 import ApiStatus from './components/ApiStatus'
 import HomePage from './pages/HomePage'
+import BrowsePage from './pages/BrowsePage'
+import BusinessDetailPage from './pages/BusinessDetailPage'
 import PlaceholderPage from './pages/PlaceholderPage'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
@@ -44,12 +46,13 @@ export default function App() {
       <main className="container flex-grow-1" id="main-content">
         <Routes>
           <Route path="/" element={<HomePage />} />
-          <Route path="/browse" element={<PlaceholderPage title="Discover your next favourite service." description="Business discovery and service browsing are on the way." />} />
+          <Route path="/browse" element={<BrowsePage />} />
+          <Route path="/businesses/:id" element={<BusinessDetailPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route element={<ProtectedRoute />}><Route path="/account" element={<AccountPage />} /></Route>
           <Route element={<ProtectedRoute role="BusinessOwner" />}><Route path="/business/dashboard" element={<BusinessDashboardPage />} /></Route>
-          <Route path="*" element={<PlaceholderPage title="Page not found." description="We couldnâ€™t find the page youâ€™re looking for." />} />
+          <Route path="*" element={<PlaceholderPage title="Page not found." description="We could not find the page you are looking for." />} />
         </Routes>
       </main>
       <footer className="site-footer"><div className="container d-flex flex-wrap justify-content-between gap-3">

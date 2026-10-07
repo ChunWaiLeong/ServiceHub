@@ -10,6 +10,16 @@ public sealed class GlobalExceptionHandler(
     public async ValueTask<bool> TryHandleAsync(
         HttpContext httpContext, Exception exception, CancellationToken cancellationToken)
     {
+        if (exception is RequestException request)
+        {
+            httpContext.Response.StatusCode = request.StatusCode;
+            return await problemDetailsService.TryWriteAsync(new ProblemDetailsContext
+            {
+                HttpContext = httpContext,
+                ProblemDetails = new ProblemDetails { Status = request.StatusCode, Title = request.Message }
+            });
+        }
+
         logger.LogError(exception, "Unhandled exception for {Method} {Path}",
             httpContext.Request.Method, httpContext.Request.Path);
 

@@ -24,7 +24,7 @@ export default function HomePage() {
       <section className="features" aria-labelledby="features-heading">
         <div className="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-4">
           <div><p className="eyebrow">THE VISION</p><h2 id="features-heading">Every step, a little easier.</h2></div>
-          <span className="small text-secondary">Planned for the ServiceHub MVP</span>
+          <span className="small text-secondary">Discovery available · Booking coming later</span>
         </div>
         <div className="row g-4">
           {[
