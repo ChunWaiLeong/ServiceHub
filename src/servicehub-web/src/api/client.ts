@@ -1,4 +1,4 @@
-const baseUrl = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5080').replace(/\/$/, '')
+import { apiBaseUrl } from './config'
 
 export class ApiError extends Error {
   constructor(public readonly status: number, message: string) { super(message) }
@@ -10,7 +10,7 @@ export async function apiRequest<T>(path: string, options: RequestInit = {}, tok
   if (options.body) headers.set('Content-Type', 'application/json')
   if (token) headers.set('Authorization', `Bearer ${token}`)
   let response: Response
-  try { response = await fetch(`${baseUrl}${path}`, { ...options, headers, cache: 'no-store' }) }
+  try { response = await fetch(`${apiBaseUrl}${path}`, { ...options, headers, cache: 'no-store' }) }
   catch { throw new ApiError(0, 'Unable to connect to ServiceHub. Please try again.') }
   if (!response.ok) {
     let message = 'The request could not be completed. Please try again.'

@@ -12,6 +12,7 @@ public sealed class JwtOptions
 
     public static bool HasStrongKey(string key)
     {
+        if (string.IsNullOrWhiteSpace(key)) return false;
         try { return Convert.FromBase64String(key).Length >= 32; }
         catch (FormatException) { return false; }
     }

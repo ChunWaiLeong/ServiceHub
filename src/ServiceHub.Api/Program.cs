@@ -13,7 +13,8 @@ using ServiceHub.Api.Data.Seeding;
 
 var seedDevelopment = args.Contains("--seed-development", StringComparer.Ordinal);
 var seedRoles = args.Contains("--seed-roles", StringComparer.Ordinal);
-var builder = WebApplication.CreateBuilder(args.Where(arg => arg != "--seed-development" && arg != "--seed-roles").ToArray());
+var seedReferenceData = args.Contains("--seed-reference-data", StringComparer.Ordinal);
+var builder = WebApplication.CreateBuilder(args.Where(arg => arg != "--seed-development" && arg != "--seed-roles" && arg != "--seed-reference-data").ToArray());
 
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
@@ -90,7 +91,12 @@ builder.Services.AddCors(options => options.AddPolicy("Frontend", policy =>
 
 var app = builder.Build();
 
-if (seedDevelopment || seedRoles)
+if (app.Environment.IsProduction())
+{
+    ProductionConfiguration.Validate(app.Configuration);
+}
+
+if (seedDevelopment || seedRoles || seedReferenceData)
 {
     if (seedDevelopment && !app.Environment.IsDevelopment())
     {
@@ -108,6 +114,12 @@ if (seedDevelopment || seedRoles)
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         await DevelopmentDataSeeder.SeedAsync(context, app.Lifetime.ApplicationStopping);
         app.Logger.LogInformation("Development categories seeded.");
+    }
+    if (seedReferenceData)
+    {
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        await ReferenceDataSeeder.SeedAsync(context, app.Lifetime.ApplicationStopping);
+        app.Logger.LogInformation("Business category reference data initialized.");
     }
     return;
 }

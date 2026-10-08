@@ -2,11 +2,13 @@
 
 ServiceHub is a portfolio appointment and service-booking platform built incrementally with React, ASP.NET Core and PostgreSQL.
 
-## Current status — Phase 6 booking creation and management
+## Current status — Phase 6 complete; production preparation added
 
 Implemented: .NET 10 controller API, health/Swagger/ProblemDetails, EF Core PostgreSQL persistence, Identity/JWT authentication and role authorization, React authentication/account pages, business profile creation/editing, owner service management, public business discovery and public profiles with active services, weekly working-hours management, temporary closures, public time-slot calculation, Customer booking/cancellation and owner booking management.
 
 Reviews, payments, notifications, analytics, admin management, refresh tokens, password reset, email verification, MFA, CI/CD and deployment remain deferred. Customers can now create appointments; every submission revalidates availability and PostgreSQL prevents overlapping Confirmed bookings.
+
+Production preparation adds category-only reference initialization, early Production configuration validation, required HTTPS frontend API configuration and Vercel SPA routing. The intended API host is Windows Azure App Service with IIS integration; nothing has been deployed. See [production configuration and initialization](docs/production-preparation.md).
 
 ## Architecture
 
@@ -84,7 +86,7 @@ dotnet run --project src/ServiceHub.Api -- --seed-development
 dotnet run --project src/ServiceHub.Api
 ```
 
-Use the existing ServiceHub database; do not reset it. Initial migration: `20261006142457_InitialServiceHub`. Phases 3–5 required no new migration. Phase 6 adds `20261008083922_ProtectConfirmedBookingIntervals`: a Confirmed-only, business-scoped exclusion constraint and the shared `public.btree_gist` extension. The migration user must be allowed to install this extension (or have an administrator preinstall it in `public`). Applied history is preserved; existing overlapping Confirmed records must be resolved before applying the constraint. Role seeding is explicit and idempotent, creates Customer/BusinessOwner/Admin, and creates no admin account. Category seeding is Development-only.
+Use the existing ServiceHub database; do not reset it. Initial migration: `20261006142457_InitialServiceHub`. Phases 3–5 required no new migration. Phase 6 adds `20261008083922_ProtectConfirmedBookingIntervals`: a Confirmed-only, business-scoped exclusion constraint and the shared `public.btree_gist` extension. The migration user must be allowed to install this extension (or have an administrator preinstall it in `public`). Applied history is preserved; existing overlapping Confirmed records must be resolved before applying the constraint. Role seeding is explicit and idempotent, creates Customer/BusinessOwner/Admin, and creates no admin account. The category-only --seed-reference-data command also supports Production; --seed-development remains Development-only.
 
 Development serves http://localhost:5080. Health: `/api/health`; Swagger: `/swagger`; OpenAPI: `/swagger/v1/swagger.json`. Local HTTP avoids certificate setup. Outside Development, HTTPS redirection/HSTS are enabled and Swagger is disabled. Public hosting is deferred.
 
@@ -96,7 +98,7 @@ pnpm install
 pnpm dev
 ```
 
-Open http://localhost:5173 (the exact hostname allowed by CORS). Vite uses a strict port. Optional frontend `.env.local`: `VITE_API_BASE_URL=http://localhost:5080`. Restart Vite after changing it. VITE_ values are public and must contain no secrets. Environment files, generated output and test results are Git-ignored.
+Open http://localhost:5173 (the exact hostname allowed by CORS). Vite uses a strict port. Optional development frontend `.env.local`: `VITE_API_BASE_URL=http://localhost:5080`. Production builds require an explicit HTTPS API origin. Restart Vite after changing it. VITE_ values are public and must contain no secrets. Environment files, generated output and test results are Git-ignored.
 
 ## Authentication
 
