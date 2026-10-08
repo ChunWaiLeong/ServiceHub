@@ -73,3 +73,16 @@ h1 span { color: #59866e; }
 @media (max-width: 767px) { .workspace-page { padding: 32px 0 44px; } .business-card, .service-card { padding: 20px; } }
 
 .btn-primary { --bs-btn-disabled-bg: #193d35; --bs-btn-disabled-border-color: #193d35; }
+
+.working-day { display: grid; grid-template-columns: 150px 1fr; gap: 20px; padding: 20px 0; border-bottom: 1px solid #e1e8df; }
+.day-heading { display: grid; gap: 10px; align-content: start; }
+.day-heading .form-check { margin-bottom: 0; }
+.day-intervals { display: grid; gap: 12px; align-content: start; }
+.hours-interval { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; }
+.hours-interval label { flex: 1 1 120px; }
+.hours-interval button { margin-bottom: 2px; }
+.closure-item { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: start; gap: 16px; border-top: 1px solid #e1e8df; margin-top: 16px; padding-top: 16px; }
+.closure-item > div { min-width: 0; overflow-wrap: anywhere; }
+.slot-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); gap: 10px; list-style: none; padding: 0; margin: 0; }
+.slot-grid li { padding: 10px; background: #eef4ea; color: #193d35; border: 1px solid #dae5d4; border-radius: 8px; text-align: center; font-size: .9rem; font-weight: 600; }
+@media (max-width: 575px) { .working-day { grid-template-columns: 1fr; gap: 12px; } .day-heading { display: flex; align-items: center; justify-content: space-between; } }

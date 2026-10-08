@@ -21,5 +21,6 @@ export async function apiRequest<T>(path: string, options: RequestInit = {}, tok
     } catch { /* A non-JSON response uses the safe fallback message. */ }
     throw new ApiError(response.status, message)
   }
+  if (response.status === 204) return undefined as T
   return response.json() as Promise<T>
 }

@@ -2,11 +2,11 @@
 
 ServiceHub is a portfolio appointment and service-booking platform built incrementally with React, ASP.NET Core and PostgreSQL.
 
-## Current status — Phase 4 business profiles and services
+## Current status — Phase 5 business availability
 
-Implemented: .NET 10 controller API, health/Swagger/ProblemDetails, EF Core PostgreSQL persistence, Identity/JWT authentication and role authorization, React authentication/account pages, business profile creation/editing, owner service management, public business discovery and public profiles with active services.
+Implemented: .NET 10 controller API, health/Swagger/ProblemDetails, EF Core PostgreSQL persistence, Identity/JWT authentication and role authorization, React authentication/account pages, business profile creation/editing, owner service management, public business discovery and public profiles with active services, weekly working-hours management, temporary closures and public time-slot previews.
 
-Availability, scheduling, appointment booking, reviews, payments, admin management, refresh tokens, password reset, email verification, MFA, CI/CD and deployment are deferred. Availability and booking tables exist; their workflows do not.
+Appointment booking, reviews, payments, admin management, refresh tokens, password reset, email verification, MFA, CI/CD and deployment are deferred. Availability is calculated dynamically; no appointment can be created yet.
 
 ## Architecture
 
@@ -24,7 +24,7 @@ One backend project uses explicit services and EF Core directly. No MediatR, CQR
 ```text
 src/ServiceHub.Api/
   Authentication/ Configuration/ Controllers/ Contracts/Auth/
-  Services/ Contracts/Businesses/ Contracts/Services/
+  Services/ Contracts/Businesses/ Contracts/Services/ Contracts/Availability/
   Data/Configurations/ Data/Migrations/ Data/Seeding/
   Models/ ErrorHandling/ Properties/ Program.cs
 src/servicehub-web/src/
@@ -32,6 +32,7 @@ src/servicehub-web/src/
 tests/ServiceHub.IntegrationTests/
 docs/authentication.md
 docs/business-management.md
+docs/availability.md
 docs/persistence.md
 docs/legacy/GoVilla.Migrations/
 ```
@@ -82,7 +83,7 @@ dotnet run --project src/ServiceHub.Api -- --seed-development
 dotnet run --project src/ServiceHub.Api
 ```
 
-Use the existing ServiceHub database; do not reset it. Initial migration: `20261006142457_InitialServiceHub`. Phases 3 and 4 require no new migration: Phase 2 already included Identity and the business/service fields. Role seeding is explicit and idempotent, creates Customer/BusinessOwner/Admin, and creates no admin account. Category seeding is Development-only.
+Use the existing ServiceHub database; do not reset it. Initial migration: `20261006142457_InitialServiceHub`. Phases 3–5 require no new migration: Phase 2 already included Identity, business/services and availability fields. Role seeding is explicit and idempotent, creates Customer/BusinessOwner/Admin, and creates no admin account. Category seeding is Development-only.
 
 Development serves http://localhost:5080. Health: `/api/health`; Swagger: `/swagger`; OpenAPI: `/swagger/v1/swagger.json`. Local HTTP avoids certificate setup. Outside Development, HTTPS redirection/HSTS are enabled and Swagger is disabled. Public hosting is deferred.
 
@@ -117,13 +118,21 @@ BusinessOwners use `/business/dashboard` to create their one business, edit deta
 
 Owners are always identified through authenticated claims. Requests do not control ownership, creation status or timestamps. Customer/Admin roles cannot use owner management endpoints. Another owner's resources return 404. Services are deactivated/reactivated, never hard-deleted; public responses show only active businesses and active services.
 
-AUD is the only supported currency. Service prices must be positive with at most two decimal places; durations must be whole minutes between 1 and 480. Business profiles require an existing category and a supported IANA time-zone ID. No availability or time conversion is implemented.
+AUD is the only supported currency. Service prices must be positive with at most two decimal places; durations must be whole minutes between 1 and 480. Business profiles require an existing category and a supported IANA time-zone ID. Availability interprets working hours in the business time zone and returns UTC appointment timestamps.
 
 See [business/service API and demo guide](docs/business-management.md) for endpoints and workflow.
 
+## Business availability
+
+Owners configure all seven days in one atomic save, with up to eight non-overlapping intervals per day and closed days represented by an empty list. Temporary closures use explicit UTC inputs; the dashboard also displays their business-local times. Public profiles let visitors choose an active service and local date to preview start times.
+
+Candidates fall on 15-minute clock boundaries, fit inside one working interval, start in the future and avoid closures and existing Confirmed bookings. Cancelled/Completed bookings do not block slots. Invalid/ambiguous DST endpoints and appointments crossing an offset change are conservatively excluded. A preview does not reserve a slot.
+
+See [availability API, algorithm and demo guide](docs/availability.md).
+
 ## Database and tests
 
-See [persistence design](docs/persistence.md) for ApplicationUser, Business, BusinessCategory, Service, BusinessWorkingHours, BusinessBlockedPeriod and Booking mappings. Booking snapshots preserve history; ServiceHub foreign keys restrict deletion. Working hours use local recurring times; appointments use UTC and half-open intervals `[start, end)`. Overlap protection is deferred.
+See [persistence design](docs/persistence.md) for ApplicationUser, Business, BusinessCategory, Service, BusinessWorkingHours, BusinessBlockedPeriod and Booking mappings. Booking snapshots preserve history; ServiceHub foreign keys restrict deletion. Working hours use local recurring times; appointments use UTC and half-open intervals `[start, end)`. Availability filters overlapping intervals; database concurrency protection for booking creation remains deferred to Phase 6.
 
 ```powershell
 dotnet build ServiceHub.sln
@@ -142,7 +151,7 @@ pnpm build
 
 The dedicated test database role needs create/drop schema permissions. Fixtures apply the actual migration in random schemas and drop only those schemas. Persistence cases roll back transactions; HTTP cases write only to their isolated schema. Interrupted runs can leave schemas for manual cleanup. Never point tests at production.
 
-Without SERVICEHUB_TEST_DATABASE, PostgreSQL tests explicitly skip; invalid configured connections fail. Model/SQL checks do not replace database tests. Phase 4 verification: **75 passed, 0 failed, 0 skipped**. All 47 previous checks remain, plus 28 business/service cases covering ownership, forged fields, unique-owner conflicts, validation, public filtering/paging and service status. Backend/frontend builds pass. Browser checks verified profile creation/editing, service creation/editing/deactivation, public search/category filtering, public details, Customer navigation and mobile layouts. A demo business and two services were added to the existing development database; one service is inactive. No database reset was performed.
+Without SERVICEHUB_TEST_DATABASE, PostgreSQL tests explicitly skip; invalid configured connections fail. Model/SQL checks do not replace database tests. Phase 5 verification: **116 passed, 0 failed, 0 skipped** against PostgreSQL. All 75 previous checks remain, plus 41 availability cases covering owner authorization, full-week replacement, closures, slot boundaries, durations, past-time filtering, booking statuses and Australian DST transitions. Backend/frontend builds pass. Live browser checks cover split weekly hours, closure creation/removal and public slot counts, with desktop/mobile layout verification. The existing demo business now has Monday 09:00–12:00 and 13:00–17:00 hours; other days are closed. The temporary verification closure was removed. No database reset or development booking insert was performed.
 
 ## Legacy transition and licence
 

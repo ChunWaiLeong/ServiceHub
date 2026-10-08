@@ -1,8 +1,10 @@
 # Phase 4 business profiles and service management
 
+This document describes the Phase 4 business/service scope. Phase 5 availability is now implemented; see [availability](availability.md).
+
 ## Scope and flow
 
-BusinessOwner → create one profile → edit profile → create/edit services → deactivate/reactivate services. Public visitors/Customers → search/filter businesses → open a public profile → view active services. No availability, appointment scheduling, booking, reviews, payments or admin management.
+BusinessOwner → create one profile → edit profile → create/edit services → deactivate/reactivate services. Public visitors/Customers → search/filter businesses → open a public profile → view active services. Availability is covered separately in Phase 5; appointment booking, reviews, payments and admin management remain deferred.
 
 React forms call api/businesses.ts and api/services.ts through the existing shared API client. AuthContext supplies bearer tokens for owner calls. Controllers validate requests and derive the authenticated owner ID from sub. BusinessService and ServiceManagementService enforce references, ownership and persistence rules through ApplicationDbContext, with asynchronous EF operations and request cancellation tokens. No repositories or service interfaces were added.
 
