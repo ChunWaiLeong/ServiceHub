@@ -9,7 +9,7 @@ export default function HomePage() {
           <h1>Your next appointment,<br /><span>simplified.</span></h1>
           <p className="hero-description">A home for the services you need and the businesses you trust. We’re building a simpler way to discover, book, and manage your appointments.</p>
           <Link className="btn btn-primary btn-lg" to="/browse">Explore ServiceHub <span aria-hidden="true">↗</span></Link>
-          <p className="mt-3 small text-secondary">Currently in development · Booking features coming later</p>
+          <p className="mt-3 small text-secondary">Discover businesses · Book your next appointment</p>
         </div>
         <div className="col-lg-5">
           <div className="intro-panel">
@@ -24,7 +24,7 @@ export default function HomePage() {
       <section className="features" aria-labelledby="features-heading">
         <div className="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-4">
           <div><p className="eyebrow">THE VISION</p><h2 id="features-heading">Every step, a little easier.</h2></div>
-          <span className="small text-secondary">Discovery available · Booking coming later</span>
+          <span className="small text-secondary">Discover, book and manage appointments</span>
         </div>
         <div className="row g-4">
           {[

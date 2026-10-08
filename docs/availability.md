@@ -1,6 +1,6 @@
 # Phase 5: business availability
 
-Availability previews are implemented. Booking creation, reservations and concurrency constraints are not. No schema migration or new package was needed: the Phase 2 working-hours, blocked-period and booking tables are reused.
+This document records the Phase 5 availability design. Phase 6 now adds booking creation and database concurrency protection; see [bookings](bookings.md). The calculation below remains shared by previews and creation. No schema migration or new package was needed: the Phase 2 working-hours, blocked-period and booking tables are reused.
 
 ## Data and ownership
 
@@ -92,10 +92,10 @@ Start PostgreSQL, configure the existing database/JWT settings and run the backe
 4. Add the example closure via the dashboard. Closure inputs explicitly ask for UTC; saved entries also show business-local times. Refresh the public preview: 20 slots remain, beginning at 10:00.
 5. Remove the closure and request the preview again: 24 slots return. Public browsing requires no login.
 
-Forms provide loading/error/success states, interval controls and responsive layouts. Preview slots are read-only and labelled as booking coming in the next release. They do not reserve anything; Phase 6 must validate again when creating a booking.
+Forms provide loading/error/success states, interval controls and responsive layouts. Phase 6 makes slots selectable and lets Customers confirm an appointment. Displaying/selecting a slot does not reserve it; creation validates the same rules again.
 
 Verification used the existing development business, leaving the Monday split schedule in place and removing the temporary test closure. No development bookings were inserted. Confirmed/cancelled/completed booking behavior, role isolation, durations and DST were verified in isolated PostgreSQL test schemas. Full suite: 116 passed, 0 failed, 0 skipped (75 existing + 41 new).
 
 ## Intentional MVP limits
 
-One business per owner, one appointment at a time per business, 15-minute starts, 1–480 minute services, AUD only, limited Australian time zones, no staff calendars, no overnight intervals, no recurring closures and no booking creation. The closure form currently asks for UTC rather than handling ambiguous business-local date-time entry. Concurrent schedule-editor conflict detection and booking reservation/concurrency enforcement remain future work.
+One business per owner, one appointment at a time per business, 15-minute starts, 1–480 minute services, AUD only, limited Australian time zones, no staff calendars, no overnight intervals, no recurring closures. Booking creation is now covered by Phase 6. The closure form currently asks for UTC rather than handling ambiguous business-local date-time entry. Concurrent schedule-editor conflict detection remains future work. Booking overlap concurrency protection is implemented in Phase 6.

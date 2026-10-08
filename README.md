@@ -2,11 +2,11 @@
 
 ServiceHub is a portfolio appointment and service-booking platform built incrementally with React, ASP.NET Core and PostgreSQL.
 
-## Current status — Phase 5 business availability
+## Current status — Phase 6 booking creation and management
 
-Implemented: .NET 10 controller API, health/Swagger/ProblemDetails, EF Core PostgreSQL persistence, Identity/JWT authentication and role authorization, React authentication/account pages, business profile creation/editing, owner service management, public business discovery and public profiles with active services, weekly working-hours management, temporary closures and public time-slot previews.
+Implemented: .NET 10 controller API, health/Swagger/ProblemDetails, EF Core PostgreSQL persistence, Identity/JWT authentication and role authorization, React authentication/account pages, business profile creation/editing, owner service management, public business discovery and public profiles with active services, weekly working-hours management, temporary closures, public time-slot calculation, Customer booking/cancellation and owner booking management.
 
-Appointment booking, reviews, payments, admin management, refresh tokens, password reset, email verification, MFA, CI/CD and deployment are deferred. Availability is calculated dynamically; no appointment can be created yet.
+Reviews, payments, notifications, analytics, admin management, refresh tokens, password reset, email verification, MFA, CI/CD and deployment remain deferred. Customers can now create appointments; every submission revalidates availability and PostgreSQL prevents overlapping Confirmed bookings.
 
 ## Architecture
 
@@ -24,7 +24,7 @@ One backend project uses explicit services and EF Core directly. No MediatR, CQR
 ```text
 src/ServiceHub.Api/
   Authentication/ Configuration/ Controllers/ Contracts/Auth/
-  Services/ Contracts/Businesses/ Contracts/Services/ Contracts/Availability/
+  Services/ Contracts/Businesses/ Contracts/Services/ Contracts/Availability/ Contracts/Bookings/
   Data/Configurations/ Data/Migrations/ Data/Seeding/
   Models/ ErrorHandling/ Properties/ Program.cs
 src/servicehub-web/src/
@@ -33,6 +33,7 @@ tests/ServiceHub.IntegrationTests/
 docs/authentication.md
 docs/business-management.md
 docs/availability.md
+docs/bookings.md
 docs/persistence.md
 docs/legacy/GoVilla.Migrations/
 ```
@@ -83,7 +84,7 @@ dotnet run --project src/ServiceHub.Api -- --seed-development
 dotnet run --project src/ServiceHub.Api
 ```
 
-Use the existing ServiceHub database; do not reset it. Initial migration: `20261006142457_InitialServiceHub`. Phases 3–5 require no new migration: Phase 2 already included Identity, business/services and availability fields. Role seeding is explicit and idempotent, creates Customer/BusinessOwner/Admin, and creates no admin account. Category seeding is Development-only.
+Use the existing ServiceHub database; do not reset it. Initial migration: `20261006142457_InitialServiceHub`. Phases 3–5 required no new migration. Phase 6 adds `20261008083922_ProtectConfirmedBookingIntervals`: a Confirmed-only, business-scoped exclusion constraint and the shared `public.btree_gist` extension. The migration user must be allowed to install this extension (or have an administrator preinstall it in `public`). Applied history is preserved; existing overlapping Confirmed records must be resolved before applying the constraint. Role seeding is explicit and idempotent, creates Customer/BusinessOwner/Admin, and creates no admin account. Category seeding is Development-only.
 
 Development serves http://localhost:5080. Health: `/api/health`; Swagger: `/swagger`; OpenAPI: `/swagger/v1/swagger.json`. Local HTTP avoids certificate setup. Outside Development, HTTPS redirection/HSTS are enabled and Swagger is disabled. Public hosting is deferred.
 
@@ -130,9 +131,19 @@ Candidates fall on 15-minute clock boundaries, fit inside one working interval, 
 
 See [availability API, algorithm and demo guide](docs/availability.md).
 
+## Booking appointments
+
+Customers select a service/date/time on a public business profile and confirm the booking. Logged-out visitors are asked to log in; BusinessOwner accounts cannot book as Customers. My Bookings on `/account` shows upcoming appointments and history, with cancellation available before a Confirmed appointment starts.
+
+Owners see business bookings, customer name/email and business-local times in their dashboard. They can filter by status, cancel Confirmed appointments and mark ended Confirmed appointments Completed. Terminal statuses cannot change. No booking is hard-deleted. Service name, price, currency and duration are copied when the booking is created.
+
+The request accepts only `serviceId` and `startUtc`. Claims determine the customer; the service determines the business and end time. The same availability calculator is called again before insertion. PostgreSQL is the final guard against competing requests; conflicts return a safe 409 response and the frontend refreshes slots. State changes use conditional SQL updates to avoid overwriting another transition.
+
+See [booking API, concurrency design and demo guide](docs/bookings.md).
+
 ## Database and tests
 
-See [persistence design](docs/persistence.md) for ApplicationUser, Business, BusinessCategory, Service, BusinessWorkingHours, BusinessBlockedPeriod and Booking mappings. Booking snapshots preserve history; ServiceHub foreign keys restrict deletion. Working hours use local recurring times; appointments use UTC and half-open intervals `[start, end)`. Availability filters overlapping intervals; database concurrency protection for booking creation remains deferred to Phase 6.
+See [persistence design](docs/persistence.md) for ApplicationUser, Business, BusinessCategory, Service, BusinessWorkingHours, BusinessBlockedPeriod and Booking mappings. Booking snapshots preserve history; ServiceHub foreign keys restrict deletion. Working hours use local recurring times; appointments use UTC and half-open intervals `[start, end)`. Availability filters overlapping intervals; a PostgreSQL exclusion constraint also prevents simultaneous overlapping Confirmed bookings.
 
 ```powershell
 dotnet build ServiceHub.sln
@@ -151,7 +162,9 @@ pnpm build
 
 The dedicated test database role needs create/drop schema permissions. Fixtures apply the actual migration in random schemas and drop only those schemas. Persistence cases roll back transactions; HTTP cases write only to their isolated schema. Interrupted runs can leave schemas for manual cleanup. Never point tests at production.
 
-Without SERVICEHUB_TEST_DATABASE, PostgreSQL tests explicitly skip; invalid configured connections fail. Model/SQL checks do not replace database tests. Phase 5 verification: **116 passed, 0 failed, 0 skipped** against PostgreSQL. All 75 previous checks remain, plus 41 availability cases covering owner authorization, full-week replacement, closures, slot boundaries, durations, past-time filtering, booking statuses and Australian DST transitions. Backend/frontend builds pass. Live browser checks cover split weekly hours, closure creation/removal and public slot counts, with desktop/mobile layout verification. The existing demo business now has Monday 09:00–12:00 and 13:00–17:00 hours; other days are closed. The temporary verification closure was removed. No database reset or development booking insert was performed.
+Without SERVICEHUB_TEST_DATABASE, PostgreSQL tests explicitly skip; invalid configured connections fail. Model/SQL checks do not replace database tests. Phase 6 verification: **151 passed, 0 failed, 0 skipped** against PostgreSQL (116 previous + 35 new). Tests include two independent HTTP requests held immediately before INSERT: both pass availability, only one commits and the other returns 409. Migration rollback/reapply and simultaneous status transitions are covered. The historical migration assertion still verifies that the initial migration has no exclusion constraint; a new assertion verifies the Phase 6 SQL. Backend/frontend builds pass.
+
+Live browser checks covered customer creation, My Bookings, owner visibility, cancellation restoring availability, stale-slot conflict feedback, role restrictions, completion of a controlled historical demo booking and responsive layouts. Two future verification bookings were cancelled, and one historical verification record was completed; all three remain as intentional demo history. No future verification reservation remains. No database reset was performed.
 
 ## Legacy transition and licence
 

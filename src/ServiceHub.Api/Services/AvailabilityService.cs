@@ -59,7 +59,7 @@ public sealed class AvailabilityService(ApplicationDbContext context, TimeProvid
         return response with { Slots = slots.Distinct().OrderBy(s => s.StartUtc).ToList() };
     }
 
-    private static TimeZoneInfo ResolveTimeZone(string id)
+    internal static TimeZoneInfo ResolveTimeZone(string id)
     {
         try { return TimeZoneInfo.FindSystemTimeZoneById(id); }
         catch (TimeZoneNotFoundException) { throw new RequestException(400, "The business time zone is unavailable on this server."); }

@@ -2,6 +2,8 @@
 
 This document records Phase 2 storage decisions. Phase 3 now configures Identity/JWT and role seeding using this schema; see [authentication design](authentication.md). The initial migration is applied locally and all PostgreSQL tests pass. Verification limits below describe the original Phase 2 run, not the current project state.
 
+Phase 6 adds the booking exclusion migration without rewriting this initial schema; see [booking design](bookings.md). Statements below describe the historical Phase 2 scope.
+
 ## Scope
 
 This phase defines storage and migrations only. No authentication configuration, JWT/refresh tokens, user registration, business endpoints, booking creation/status workflows, slot generation, overlap constraint, admin interface, or frontend feature pages are implemented.

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import BookingsPanel from '../components/BookingsPanel'
 import { useAuth } from '../auth/AuthContext'
 
 export default function AccountPage() {
@@ -15,6 +16,6 @@ export default function AccountPage() {
     <p className="lead">You’re signed in to ServiceHub.</p>
     <dl><dt>Name</dt><dd>{user?.firstName} {user?.lastName}</dd><dt>Email</dt><dd>{user?.email}</dd><dt>Account type</dt><dd>{user?.role}</dd></dl>
     <p role="status" className="text-secondary">{status}</p>
-    <p>Appointment management will arrive in a later phase.</p>
+    {user?.role === 'Customer' && <BookingsPanel />}
   </section>
 }

@@ -6,6 +6,7 @@ import * as services from '../api/services'
 import { ApiError } from '../api/client'
 import BusinessForm from '../components/BusinessForm'
 import ServiceForm from '../components/ServiceForm'
+import BookingsPanel from '../components/BookingsPanel'
 import OwnerAvailabilityPanel from '../components/OwnerAvailabilityPanel'
 
 export default function BusinessDashboardPage() {
@@ -89,6 +90,7 @@ export default function BusinessDashboardPage() {
           <div className="d-flex flex-wrap gap-2"><button className="btn btn-outline-primary btn-sm" disabled={serviceEditor !== undefined || statusPending !== null} onClick={() => { setServiceEditor(service); setNotice('') }}>Edit {service.name}</button><button className="btn btn-outline-secondary btn-sm" disabled={statusPending !== null || serviceEditor !== undefined} onClick={() => toggleStatus(service)}>{statusPending === service.id ? 'Saving…' : `${service.isActive ? 'Deactivate' : 'Activate'} ${service.name}`}</button></div>
         </article></div>)}</div>}
       </section>}
+      {business && <BookingsPanel owner />}
       {business && <OwnerAvailabilityPanel timeZoneId={business.timeZoneId} />}
     </>}
   </section>

@@ -38,7 +38,7 @@ export default function BrowsePage() {
   function goToPage(next: number) { const query = new URLSearchParams(params); query.set('page', String(next)); setParams(query) }
   const pageCount = result ? Math.ceil(result.totalCount / result.pageSize) : 0
   return <section className="workspace-page">
-    <div className="discovery-intro"><p className="eyebrow">DISCOVER SERVICEHUB</p><h1>Find your next<br /><span>local favourite.</span></h1><p className="text-secondary">Explore independent businesses and the services they offer.</p><span className="small text-secondary">Online booking coming soon.</span></div>
+    <div className="discovery-intro"><p className="eyebrow">DISCOVER SERVICEHUB</p><h1>Find your next<br /><span>local favourite.</span></h1><p className="text-secondary">Explore independent businesses and the services they offer.</p><span className="small text-secondary">Choose a service and book an available time.</span></div>
     <form className="panel search-panel row g-3 align-items-end" onSubmit={filter}>
       <div className="col-md-6"><label htmlFor="business-search" className="form-label">Search businesses</label><input id="business-search" className="form-control" type="search" placeholder="Name, description or address" maxLength={100} value={draft} onChange={e => setDraft(e.target.value)} /></div>
       <div className="col-md-4"><label htmlFor="category-filter" className="form-label">Category</label><select id="category-filter" className="form-select" value={categoryDraft} onChange={e => setCategoryDraft(e.target.value)}><option value="">All categories</option>{categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>

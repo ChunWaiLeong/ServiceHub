@@ -82,9 +82,9 @@ public sealed class PersistenceModelTests
     {
         using var context = CreateContext();
         var migrations = context.Database.GetMigrations().ToList();
-        Assert.Single(migrations);
+        Assert.Contains("20261008083922_ProtectConfirmedBookingIntervals", migrations);
         Assert.EndsWith("_InitialServiceHub", migrations[0]);
-        var script = context.GetService<IMigrator>().GenerateScript();
+        var script = context.GetService<IMigrator>().GenerateScript(toMigration: migrations[0]);
         Assert.Contains("CREATE TABLE \"Businesses\"", script);
         Assert.Contains("numeric(12,2)", script);
         Assert.Contains("ON DELETE RESTRICT", script);
@@ -92,4 +92,18 @@ public sealed class PersistenceModelTests
         Assert.DoesNotContain("EXCLUDE", script);
         Assert.False(context.Database.HasPendingModelChanges());
     }
+    [Fact]
+    public void BookingMigration_AddsBusinessScopedConfirmedOnlyExclusion()
+    {
+        using var context = CreateContext();
+        var script = context.GetService<IMigrator>().GenerateScript(fromMigration: "20261006142457_InitialServiceHub");
+        Assert.Contains("CREATE EXTENSION IF NOT EXISTS btree_gist WITH SCHEMA public", script);
+        Assert.Contains("EXCLUDE USING gist", script);
+        Assert.Contains("public.gist_uuid_ops WITH =", script);
+        Assert.Contains("tstzrange(\"StartUtc\", \"EndUtc\", '[)') WITH &&", script);
+        Assert.Contains("WHERE (\"Status\" = 'Confirmed')", script);
+        Assert.DoesNotContain("GoVilla", script);
+        Assert.False(context.Database.HasPendingModelChanges());
+    }
+
 }

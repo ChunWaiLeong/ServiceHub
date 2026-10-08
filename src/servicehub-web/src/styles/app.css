@@ -86,3 +86,12 @@ h1 span { color: #59866e; }
 .slot-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); gap: 10px; list-style: none; padding: 0; margin: 0; }
 .slot-grid li { padding: 10px; background: #eef4ea; color: #193d35; border: 1px solid #dae5d4; border-radius: 8px; text-align: center; font-size: .9rem; font-weight: 600; }
 @media (max-width: 575px) { .working-day { grid-template-columns: 1fr; gap: 12px; } .day-heading { display: flex; align-items: center; justify-content: space-between; } }
+
+.slot-grid li:has(.slot-button) { padding: 0; border: 0; background: transparent; }
+.slot-button { width: 100%; padding: 10px 6px; border: 1px solid #dae5d4; border-radius: 8px; background: #eef4ea; color: #193d35; font: inherit; }
+.slot-button:hover, .slot-button.selected { background: #193d35; color: white; }
+.slot-button:focus-visible { outline: 3px solid #8ba77d; outline-offset: 2px; }
+.booking-confirmation { border: 1px solid #cad8c7; background: #f2f6ee; border-radius: 12px; }
+.booking-status-cancelled { background: #eeefec; color: #656e66; }
+.booking-status-completed { background: #e2ecf7; color: #28516e; }
+.booking-customer { padding: 12px; background: #f5f7f3; border-radius: 8px; overflow-wrap: anywhere; }

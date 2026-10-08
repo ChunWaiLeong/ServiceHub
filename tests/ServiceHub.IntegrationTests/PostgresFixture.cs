@@ -21,6 +21,7 @@ public sealed class PostgresFixture : IAsyncLifetime
     private readonly string? connectionString = Environment.GetEnvironmentVariable("SERVICEHUB_TEST_DATABASE");
     private readonly string schema = "servicehub_test_" + Guid.NewGuid().ToString("N");
     private bool schemaCreated;
+    private static readonly SemaphoreSlim MigrationGate = new(1, 1);
 
     public string GetConnectionString()
     {
@@ -50,7 +51,10 @@ public sealed class PostgresFixture : IAsyncLifetime
         try
         {
             await using var context = CreateContext();
-            await context.Database.MigrateAsync();
+            // Extension installation is database-wide; concurrent fixture migrations must not race it.
+            await MigrationGate.WaitAsync();
+            try { await context.Database.MigrateAsync(); }
+            finally { MigrationGate.Release(); }
         }
         catch
         {

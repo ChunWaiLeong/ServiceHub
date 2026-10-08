@@ -3,14 +3,19 @@ import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 
 export default function LoginPage() {
-  const { login, isAuthenticated } = useAuth()
+  const { login, isAuthenticated, user } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
-  if (isAuthenticated) return <Navigate to="/account" replace />
+  function destination(role: string) {
+    const from = (location.state as { from?: string } | null)?.from
+    return from && (/^\/businesses\/[0-9a-f-]{36}$/i.test(from) || from === '/account'
+      || (from === '/business/dashboard' && role === 'BusinessOwner')) ? from : '/account'
+  }
+  if (isAuthenticated && user) return <Navigate to={destination(user.role)} replace />
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -18,10 +23,7 @@ export default function LoginPage() {
     try {
       const user = await login(email, password)
       setPassword('')
-      const from = (location.state as { from?: string } | null)?.from
-      const destination = from === '/account' || (from === '/business/dashboard' && user.role === 'BusinessOwner')
-        ? from : '/account'
-      navigate(destination, { replace: true })
+      navigate(destination(user.role), { replace: true })
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : 'Unable to connect. Please try again.')
     } finally { setBusy(false) }
