@@ -185,7 +185,7 @@ public sealed class AvailabilityTests(PostgresFixture database) : IClassFixture<
     {
         await using var factory = await FactoryAsync(); using var owner = await SignedInAsync(factory);
         await ApiBusinessAsync(owner);
-        var response = await owner.PostAsJsonAsync("/api/owner/business/blocked-periods", new BlockedPeriodRequest("2030-01-07T00:00:00Z", "2030-01-07T01:00:00Z", " Maintenance "));
+        var response = await owner.PostAsJsonAsync("/api/owner/business/blocked-periods", new BlockedPeriodRequest("2030-01-07T11:00", "2030-01-07T12:00", " Maintenance "));
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var closure = (await response.Content.ReadFromJsonAsync<BlockedPeriodResponse>())!;
         Assert.Equal("Maintenance", closure.Reason); Assert.Equal(DateTimeKind.Utc, closure.StartUtc.Kind);
@@ -211,8 +211,8 @@ public sealed class AvailabilityTests(PostgresFixture database) : IClassFixture<
         await HoursAsync(context, entity, Monday.DayOfWeek, ("09:00", "17:00"));
 
         // Sydney daylight time: 01:25–03:40 UTC is 12:25–14:40 business-local.
-        var start = "2030-01-07T01:25:00.000Z";
-        var end = "2030-01-07T03:40:00.000Z";
+        var start = "2030-01-07T12:25";
+        var end = "2030-01-07T14:40";
         var response = await owner.PostAsJsonAsync("/api/owner/business/blocked-periods", new BlockedPeriodRequest(start, end, null));
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var saved = (await response.Content.ReadFromJsonAsync<BlockedPeriodResponse>())!;
@@ -232,12 +232,86 @@ public sealed class AvailabilityTests(PostgresFixture database) : IClassFixture<
     }
 
     [PostgresTheory]
-    [InlineData("2030-01-07T00:00:00Z", "2030-01-07T00:00:00Z")]
-    [InlineData("2030-01-07T01:00:00Z", "2030-01-07T00:00:00Z")]
-    [InlineData("2030-01-07T00:00:00", "2030-01-07T01:00:00Z")]
-    [InlineData("2030-01-07T00:00:00+10:00", "2030-01-07T01:00:00Z")]
-    [InlineData("2030-01-07T00:00:00Z", "2032-01-07T00:00:00Z")]
-    [InlineData("1900-01-07T00:00:00Z", "1900-01-07T01:00:00Z")]
+    [InlineData("Australia/Sydney", "2026-10-10", "2026-10-10T02:00:00Z")]
+    [InlineData("Australia/Sydney", "2026-07-10", "2026-07-10T03:00:00Z")]
+    [InlineData("Australia/Brisbane", "2026-10-10", "2026-10-10T03:00:00Z")]
+    [InlineData("Australia/Perth", "2026-10-10", "2026-10-10T05:00:00Z")]
+    [InlineData("Australia/Adelaide", "2026-10-10", "2026-10-10T02:30:00Z")]
+    [InlineData("Australia/Darwin", "2026-10-10", "2026-10-10T03:30:00Z")]
+    [InlineData("Australia/Sydney", "2026-10-04", "2026-10-04T02:00:00Z")]
+    [InlineData("Australia/Sydney", "2026-04-05", "2026-04-05T03:00:00Z")]
+    public async Task LocalClosure_ConvertsAndRoundTripsInBusinessZone(string zoneId, string date, string expectedStart)
+    {
+        await using var factory = await FactoryAsync(); using var owner = await SignedInAsync(factory);
+        var business = await ApiBusinessAsync(owner);
+        await using var context = database.CreateContext();
+        var entity = await context.Businesses.SingleAsync(b => b.Id == business.Id);
+        entity.TimeZoneId = zoneId;
+        await context.SaveChangesAsync();
+        var response = await owner.PostAsJsonAsync("/api/owner/business/blocked-periods", new BlockedPeriodRequest(date + "T13:00", date + "T17:00", "Local closure"));
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var saved = (await response.Content.ReadFromJsonAsync<BlockedPeriodResponse>())!;
+        var expected = DateTimeOffset.Parse(expectedStart).UtcDateTime;
+        Assert.Equal(expected, saved.StartUtc);
+        Assert.Equal(expected.AddHours(4), saved.EndUtc);
+        var persisted = await context.BusinessBlockedPeriods.AsNoTracking().SingleAsync(p => p.Id == saved.Id);
+        Assert.Equal(saved.StartUtc, persisted.StartUtc);
+        Assert.Equal(saved.EndUtc, persisted.EndUtc);
+        var zone = TimeZoneInfo.FindSystemTimeZoneById(zoneId);
+        Assert.Equal(date + "T13:00", TimeZoneInfo.ConvertTimeFromUtc(persisted.StartUtc, zone).ToString("yyyy-MM-dd'T'HH:mm"));
+        Assert.Equal(date + "T17:00", TimeZoneInfo.ConvertTimeFromUtc(persisted.EndUtc, zone).ToString("yyyy-MM-dd'T'HH:mm"));
+    }
+
+    [PostgresTheory]
+    [InlineData("2026-10-04T01:30", "2026-10-04T03:30", "2026-10-03T15:30:00Z", 1)]
+    [InlineData("2026-04-05T01:30", "2026-04-05T03:30", "2026-04-04T14:30:00Z", 3)]
+    public async Task LocalClosure_SpanningDstUsesActualUtcDuration(string start, string end, string expectedStart, int hours)
+    {
+        await using var factory = await FactoryAsync(); using var owner = await SignedInAsync(factory);
+        await ApiBusinessAsync(owner);
+        var response = await owner.PostAsJsonAsync("/api/owner/business/blocked-periods", new BlockedPeriodRequest(start, end, null));
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var saved = (await response.Content.ReadFromJsonAsync<BlockedPeriodResponse>())!;
+        Assert.Equal(DateTimeOffset.Parse(expectedStart).UtcDateTime, saved.StartUtc);
+        Assert.Equal(TimeSpan.FromHours(hours), saved.EndUtc - saved.StartUtc);
+    }
+
+    [PostgresFact]
+    public async Task LegacyUtcClosurePayload_IsRejectedInsteadOfMisinterpreted()
+    {
+        await using var factory = await FactoryAsync(); using var owner = await SignedInAsync(factory);
+        var business = await ApiBusinessAsync(owner);
+        var response = await owner.PostAsJsonAsync("/api/owner/business/blocked-periods", new {
+            startUtc = "2030-01-07T13:00:00Z", endUtc = "2030-01-07T17:00:00Z", reason = "Legacy payload"
+        });
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        await using var context = database.CreateContext();
+        Assert.False(await context.BusinessBlockedPeriods.AnyAsync(p => p.BusinessId == business.Id));
+    }
+
+    [PostgresTheory]
+    [InlineData("2026-10-04T02:30", "2026-10-04T04:00")]
+    [InlineData("2026-10-04T01:00", "2026-10-04T02:30")]
+    [InlineData("2026-04-05T02:30", "2026-04-05T04:00")]
+    [InlineData("2026-04-05T01:00", "2026-04-05T02:30")]
+    public async Task LocalClosure_RejectsSkippedAndRepeatedDstEndpoints(string start, string end)
+    {
+        await using var factory = await FactoryAsync(); using var owner = await SignedInAsync(factory);
+        var business = await ApiBusinessAsync(owner);
+        var response = await owner.PostAsJsonAsync("/api/owner/business/blocked-periods", new BlockedPeriodRequest(start, end, null));
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains("daylight-saving", await response.Content.ReadAsStringAsync());
+        await using var context = database.CreateContext();
+        Assert.False(await context.BusinessBlockedPeriods.AnyAsync(p => p.BusinessId == business.Id));
+    }
+
+    [PostgresTheory]
+    [InlineData("2030-01-07T00:00", "2030-01-07T00:00")]
+    [InlineData("2030-01-07T01:00", "2030-01-07T00:00")]
+    [InlineData("2030-01-07T00:00Z", "2030-01-07T01:00")]
+    [InlineData("2030-01-07T00:00+10:00", "2030-01-07T01:00")]
+    [InlineData("2030-01-07T00:00", "2032-01-07T00:00")]
+    [InlineData("1900-01-07T00:00", "1900-01-07T01:00")]
     public async Task InvalidClosure_IsRejected(string start, string end)
     {
         await using var factory = await FactoryAsync(); using var owner = await SignedInAsync(factory); await ApiBusinessAsync(owner);

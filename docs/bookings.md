@@ -42,7 +42,11 @@ One conditional SQL UPDATE requires the current state to remain Confirmed and in
 
 ## PostgreSQL concurrency safeguard
 
+Two simultaneous conflicting inserts can fail either with the named exclusion violation (`23P01`) or with a deadlock (`40P01`): each exclusion scan may see and wait for the other's uncommitted tuple. PostgreSQL aborts one transaction so the other can finish. Booking creation maps both outcomes to the same safe 409 without exposing database details. This handling is limited to the booking INSERT save; unrelated exclusions and other database errors retain normal error handling. No retry is needed to create the already-conflicting appointment. The existing independent-request test preserves its INSERT barrier and verifies one commit, one conflict and the actual PostgreSQL failure code. Deterministic error-mapping tests complement, rather than replace, that real race. See [PostgreSQL's exclusion-check implementation](https://github.com/postgres/postgres/blob/REL_16_STABLE/src/backend/executor/execIndexing.c#L27-L44).
+
 Migration: `20261008083922_ProtectConfirmedBookingIntervals`.
+
+Npgsql's default non-retrying execution strategy treats deadlocks as transient and wraps the `DbUpdateException` in `InvalidOperationException`. The booking INSERT handler recognizes that wrapper and checks the underlying SQLSTATE. It does not convert arbitrary transient failures, serialization failures, unique violations or unrelated constraint violations to 409.
 
 ```sql
 CREATE EXTENSION IF NOT EXISTS btree_gist WITH SCHEMA public;

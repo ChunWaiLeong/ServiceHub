@@ -9,8 +9,8 @@ public sealed record WeeklyHoursRequest([Required, MaxLength(7)] List<WorkingDay
 public sealed record WorkingIntervalResponse(TimeOnly StartTime, TimeOnly EndTime);
 public sealed record WorkingDayResponse(int DayOfWeek, IReadOnlyList<WorkingIntervalResponse> Intervals);
 public sealed record WeeklyHoursResponse(IReadOnlyList<WorkingDayResponse> Days);
-public sealed record BlockedPeriodRequest([Required, StringLength(40)] string StartUtc,
-    [Required, StringLength(40)] string EndUtc, [StringLength(500)] string? Reason);
+public sealed record BlockedPeriodRequest([Required, StringLength(16)] string StartLocal,
+    [Required, StringLength(16)] string EndLocal, [StringLength(500)] string? Reason);
 public sealed record BlockedPeriodResponse(Guid Id, DateTime StartUtc, DateTime EndUtc, string? Reason);
 public sealed class AvailabilityQuery
 {

@@ -38,12 +38,25 @@ public sealed class BookingService(ApplicationDbContext context, AvailabilitySer
             ServiceDurationMinutes = service.DurationMinutes };
         context.Bookings.Add(booking);
         try { await context.SaveChangesAsync(ct); }
-        catch (DbUpdateException ex) when (ex.InnerException is PostgresException
-            { SqlState: PostgresErrorCodes.ExclusionViolation, ConstraintName: OverlapConstraint })
+        catch (Exception ex) when (IsBookingInsertConflict(ex))
         {
+            // Competing exclusion checks can deadlock; PostgreSQL aborts one insert.
+            // This translation is scoped to creating a booking, not other database writes.
             throw SlotConflict();
         }
         return await GetCustomerAsync(customerId, booking.Id, ct);
+    }
+
+    private static bool IsBookingInsertConflict(Exception exception)
+    {
+        // Npgsql's non-retrying execution strategy wraps transient deadlocks in
+        // InvalidOperationException around the DbUpdateException. Inspect the SQLSTATE,
+        // never the message text, without mapping other transient failures to conflicts.
+        if (exception is InvalidOperationException { InnerException: DbUpdateException update })
+            exception = update;
+        return exception is DbUpdateException { InnerException: PostgresException postgres }
+            && (postgres is { SqlState: PostgresErrorCodes.ExclusionViolation, ConstraintName: OverlapConstraint }
+                || postgres.SqlState == PostgresErrorCodes.DeadlockDetected);
     }
 
     public async Task<IReadOnlyList<BookingResponse>> ListCustomerAsync(Guid customerId, CancellationToken ct)

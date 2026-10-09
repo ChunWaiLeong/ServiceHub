@@ -2,15 +2,15 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { closureInput } from '../src/api/closureTimes.ts'
 
-test('custom dates and minute-level times are preserved in the UTC request', () => {
+test('custom dates and minute-level times are preserved as business-local values', () => {
   assert.deepEqual(closureInput('2030-01-07', '01:25', '2030-01-07', '03:40', ' Maintenance '), {
-    startUtc: '2030-01-07T01:25:00.000Z', endUtc: '2030-01-07T03:40:00.000Z', reason: 'Maintenance',
+    startLocal: '2030-01-07T01:25', endLocal: '2030-01-07T03:40', reason: 'Maintenance',
   })
 })
 
 test('closures can span midnight with an optional reason', () => {
   assert.deepEqual(closureInput('2030-01-07', '23:45', '2030-01-08', '00:15', '  '), {
-    startUtc: '2030-01-07T23:45:00.000Z', endUtc: '2030-01-08T00:15:00.000Z', reason: null,
+    startLocal: '2030-01-07T23:45', endLocal: '2030-01-08T00:15', reason: null,
   })
 })
 
@@ -26,15 +26,13 @@ test('missing times and invalid dates are rejected rather than defaulting to mid
   }
 })
 
-test('UTC input displays in the business timezone independently of the browser timezone', () => {
+test('business-local input is unchanged by the browser timezone', () => {
   const previous = process.env.TZ
   try {
     process.env.TZ = 'America/New_York'
     const input = closureInput('2030-01-07', '01:25', '2030-01-07', '03:40', '')
-    assert.equal(input.startUtc, '2030-01-07T01:25:00.000Z')
-    const parts = new Intl.DateTimeFormat('en-AU', { timeZone: 'Australia/Sydney', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date(input.startUtc))
-    assert.equal(parts.find(part => part.type === 'hour').value, '12')
-    assert.equal(parts.find(part => part.type === 'minute').value, '25')
+    assert.equal(input.startLocal, '2030-01-07T01:25')
+    assert.equal(input.endLocal, '2030-01-07T03:40')
   } finally {
     if (previous === undefined) delete process.env.TZ
     else process.env.TZ = previous

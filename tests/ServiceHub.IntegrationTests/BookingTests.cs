@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Data.Common;
 using System.Net;
 using System.Net.Http.Headers;
@@ -18,10 +19,11 @@ using ServiceHub.Api.Data.Seeding;
 using ServiceHub.Api.Models;
 using ServiceHub.Api.Services;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace ServiceHub.IntegrationTests;
 
-public sealed class BookingTests(PostgresFixture database) : IClassFixture<PostgresFixture>
+public sealed class BookingTests(PostgresFixture database, ITestOutputHelper output) : IClassFixture<PostgresFixture>
 {
     private static readonly DateTime Start = new(2030, 1, 6, 22, 0, 0, DateTimeKind.Utc); // Sydney Monday 09:00
     private sealed record Actor(HttpClient Client, Guid Id);
@@ -48,7 +50,7 @@ public sealed class BookingTests(PostgresFixture database) : IClassFixture<Postg
         await using var context = database.CreateContext();
         return new(client, (await context.Users.SingleAsync(u => u.Email == email)).Id);
     }
-    private async Task<Scenario> SetupAsync(InsertBarrier? barrier = null)
+    private async Task<Scenario> SetupAsync(DbCommandInterceptor? barrier = null)
     {
         var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
@@ -226,6 +228,7 @@ public sealed class BookingTests(PostgresFixture database) : IClassFixture<Postg
         private readonly TaskCompletionSource ready = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private int arrivals;
         public int Arrivals => arrivals;
+        public ConcurrentBag<string> FailureSqlStates { get; } = [];
         public override async ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(DbCommand command, CommandEventData eventData,
             InterceptionResult<DbDataReader> result, CancellationToken cancellationToken = default)
         {
@@ -236,6 +239,13 @@ public sealed class BookingTests(PostgresFixture database) : IClassFixture<Postg
             }
             return result;
         }
+        public override Task CommandFailedAsync(DbCommand command, CommandErrorEventData eventData, CancellationToken cancellationToken = default)
+        {
+            if (command.CommandText.Contains("INSERT INTO \"Bookings\"", StringComparison.Ordinal)
+                && eventData.Exception is PostgresException postgres)
+                FailureSqlStates.Add(postgres.SqlState);
+            return Task.CompletedTask;
+        }
     }
     [PostgresFact]
     public async Task ConcurrentRequests_BothPassAvailability_OnlyOneCommits_AndDatabaseConflictBecomes409()
@@ -245,10 +255,46 @@ public sealed class BookingTests(PostgresFixture database) : IClassFixture<Postg
         var responses = await Task.WhenAll(CreateAsync(s), CreateAsync(s, client: otherClient));
         Assert.Equal(2, barrier.Arrivals); // Both independent contexts reached INSERT after availability validation.
         Assert.Equal(new[] { 201,409 }, responses.Select(x => (int)x.StatusCode).OrderBy(x => x));
+        var sqlState = Assert.Single(barrier.FailureSqlStates);
+        Assert.Contains(sqlState, new[] { PostgresErrorCodes.ExclusionViolation, PostgresErrorCodes.DeadlockDetected });
+        output.WriteLine("Observed competing insert SQLSTATE: " + sqlState);
         var conflict = await responses.Single(x => x.StatusCode == HttpStatusCode.Conflict).Content.ReadAsStringAsync();
         Assert.Contains("no longer available", conflict); Assert.DoesNotContain("23P01", conflict); Assert.DoesNotContain("EX_Bookings", conflict);
+        Assert.DoesNotContain("40P01", conflict); Assert.DoesNotContain("deadlock", conflict.ToLowerInvariant());
         await using var context = database.CreateContext(); Assert.Equal(1, await context.Bookings.CountAsync(x => x.BusinessId == s.Business.Id));
     }
+    private sealed class InsertFailure(string sqlState, string? constraintName) : DbCommandInterceptor
+    {
+        public override ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(DbCommand command, CommandEventData eventData,
+            InterceptionResult<DbDataReader> result, CancellationToken cancellationToken = default)
+        {
+            if (command.CommandText.Contains("INSERT INTO \"Bookings\"", StringComparison.Ordinal))
+                throw new PostgresException("Internal database detail", "ERROR", "ERROR", sqlState, constraintName: constraintName);
+            return ValueTask.FromResult(result);
+        }
+    }
+
+    [PostgresTheory]
+    [InlineData(PostgresErrorCodes.DeadlockDetected, null, 409)]
+    [InlineData(PostgresErrorCodes.ExclusionViolation, BookingService.OverlapConstraint, 409)]
+    [InlineData(PostgresErrorCodes.ExclusionViolation, "unrelated_constraint", 500)]
+    [InlineData(PostgresErrorCodes.UniqueViolation, "unrelated_constraint", 500)]
+    [InlineData(PostgresErrorCodes.SerializationFailure, null, 500)]
+    public async Task BookingInsertFailure_MapsOnlyExpectedConflictsToSafeProblemDetails(string sqlState, string? constraint, int expected)
+    {
+        await using var s = await SetupAsync(new InsertFailure(sqlState, constraint));
+        var response = await CreateAsync(s);
+        Assert.Equal(expected, (int)response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        var body = await response.Content.ReadAsStringAsync();
+        if (expected == 409) Assert.Contains("no longer available", body);
+        Assert.DoesNotContain(sqlState, body);
+        Assert.DoesNotContain("Internal database detail", body);
+        if (constraint is not null) Assert.DoesNotContain(constraint, body);
+        await using var context = database.CreateContext();
+        Assert.False(await context.Bookings.AnyAsync(b => b.BusinessId == s.Business.Id));
+    }
+
     [PostgresFact]
     public async Task DatabaseConstraint_IsBusinessScoped_HalfOpen_AndConfirmedOnly()
     {

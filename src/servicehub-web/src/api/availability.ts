@@ -4,7 +4,7 @@ export interface WorkingInterval { startTime: string; endTime: string }
 export interface WorkingDay { dayOfWeek: number; intervals: WorkingInterval[] }
 export interface WeeklyHours { days: WorkingDay[] }
 export interface BlockedPeriod { id: string; startUtc: string; endUtc: string; reason: string | null }
-export interface BlockedPeriodInput { startUtc: string; endUtc: string; reason: string | null }
+export interface BlockedPeriodInput { startLocal: string; endLocal: string; reason: string | null }
 export interface AvailableSlot { startUtc: string; endUtc: string }
 export interface Availability {
   businessId: string; serviceId: string; date: string; timeZoneId: string; durationMinutes: number; slots: AvailableSlot[]

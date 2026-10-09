@@ -1,6 +1,6 @@
 # Phase 5: business availability
 
-Temporary closures use separate required start-date, start-time, end-date and end-time controls, with an optional reason. Inputs remain explicitly UTC, preserving the existing API contract; saved closures display in the business time zone. No time is defaulted or fixed. Both frontend and backend reject an end at or before the start. The controls stack on narrow screens. Frontend regression checks run with `pnpm test` from `src/servicehub-web`.
+Temporary closures use separate required start-date, start-time, end-date and end-time controls, with an optional reason. Inputs are local wall-clock values in the business TimeZoneId, independent of the browser time zone. The API accepts startLocal/endLocal as yyyy-MM-ddTHH:mm without an offset, converts them authoritatively using the stored business zone, and returns UTC timestamps for business-local display. No time is defaulted or fixed. Deploy the updated frontend and API together because the creation fields changed from startUtc/endUtc to startLocal/endLocal. Existing saved closures are not rewritten; incorrectly entered old closures must be removed and recreated. Both frontend and backend reject an end at or before the start. The controls stack on narrow screens. Frontend regression checks run with `pnpm test` from `src/servicehub-web`.
 
 This document records the Phase 5 availability design. Phase 6 now adds booking creation and database concurrency protection; see [bookings](bookings.md). The calculation below remains shared by previews and creation. No schema migration or new package was needed: the Phase 2 working-hours, blocked-period and booking tables are reused.
 
@@ -10,7 +10,7 @@ Working hours are local recurring `TimeOnly` values associated with a business a
 
 PUT replaces the entire week. Validation happens before changes; one EF Core `SaveChangesAsync` transaction commits deletes and inserts together. It does not provide concurrent-editor conflict/version detection.
 
-Blocked periods are UTC ranges with an optional reason (500 characters). Start must precede end, years must be 2000–2100 and the range may span at most 366 days. UTC timestamps must include `Z` or `+00:00`; timestamps without an offset or with a non-UTC offset are rejected. Closures can overlap, span dates and be deleted/recreated; there is no recurring closure or edit operation. GET returns upcoming and ongoing closures, sorted by start.
+Blocked periods are UTC ranges with an optional reason (500 characters). Start must precede end, years must be 2000–2100 and the range may span at most 366 days. Creation accepts business-local timestamps without Z or an offset. Skipped or ambiguous DST endpoints are rejected with 400; valid endpoints are converted separately, so a closure may safely span a DST transition. Database storage and response fields remain StartUtc/EndUtc. Closures can overlap, span dates and be deleted/recreated; there is no recurring closure or edit operation. GET returns upcoming and ongoing closures, sorted by start.
 
 Owner routes require BusinessOwner role. The owner's ID comes exclusively from authenticated claims, and the business is resolved server-side. There is no client business/owner ID on schedule writes. Deleting another owner's closure returns 404. Customers receive 403 and unauthenticated requests receive 401. Existing inactive-account checks apply.
 
@@ -50,8 +50,8 @@ Example closure POST body:
 
 ```json
 {
-  "startUtc": "2030-01-06T22:30:00Z",
-  "endUtc": "2030-01-06T23:00:00Z",
+  "startLocal": "2030-01-07T09:30",
+  "endLocal": "2030-01-07T10:00",
   "reason": "Temporary closure"
 }
 ```
@@ -91,7 +91,7 @@ Start PostgreSQL, configure the existing database/JWT settings and run the backe
 1. Sign in as a BusinessOwner with a business and active service. Open Business Dashboard → Availability.
 2. Mark Monday open, set 09:00–12:00 and add 13:00–17:00. Leave other days closed and save the week.
 3. Open the public profile, choose a 45-minute service and Monday 2030-01-07: 24 slots are expected, ending at 11:15 and 16:15 for each interval.
-4. Add the example closure via the dashboard. Closure inputs explicitly ask for UTC; saved entries also show business-local times. Refresh the public preview: 20 slots remain, beginning at 10:00.
+4. Add the example closure via the dashboard. Closure inputs and saved entries use the business time zone; the API converts inputs to UTC for storage. Refresh the public preview: 20 slots remain, beginning at 10:00.
 5. Remove the closure and request the preview again: 24 slots return. Public browsing requires no login.
 
 Forms provide loading/error/success states, interval controls and responsive layouts. Phase 6 makes slots selectable and lets Customers confirm an appointment. Displaying/selecting a slot does not reserve it; creation validates the same rules again.
@@ -100,4 +100,4 @@ Verification used the existing development business, leaving the Monday split sc
 
 ## Intentional MVP limits
 
-One business per owner, one appointment at a time per business, 15-minute starts, 1–480 minute services, AUD only, limited Australian time zones, no staff calendars, no overnight intervals, no recurring closures. Booking creation is now covered by Phase 6. The closure form currently asks for UTC rather than handling ambiguous business-local date-time entry. Concurrent schedule-editor conflict detection remains future work. Booking overlap concurrency protection is implemented in Phase 6.
+One business per owner, one appointment at a time per business, 15-minute starts, 1–480 minute services, AUD only, limited Australian time zones, no staff calendars, no overnight intervals, no recurring closures. Booking creation is now covered by Phase 6. The closure form uses business-local date/time entry and rejects ambiguous or skipped DST endpoints. Concurrent schedule-editor conflict detection remains future work. Booking overlap concurrency protection is implemented in Phase 6.

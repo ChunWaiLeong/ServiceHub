@@ -63,8 +63,9 @@ public sealed class OwnerAvailabilityService(ApplicationDbContext context, Busin
     public async Task<BlockedPeriodResponse> CreateBlockedPeriodAsync(Guid ownerId, BlockedPeriodRequest request, CancellationToken ct)
     {
         var business = await businesses.GetOwnerAsync(ownerId, ct);
-        var start = ParseUtc(request.StartUtc);
-        var end = ParseUtc(request.EndUtc);
+        var zone = TimeZoneInfo.FindSystemTimeZoneById(business.TimeZoneId);
+        var start = LocalToUtc(request.StartLocal, zone);
+        var end = LocalToUtc(request.EndLocal, zone);
         if (start >= end || end - start > TimeSpan.FromDays(366))
             throw new RequestException(400, "Closure end must be after its start, with a maximum length of 366 days.");
         var period = new BusinessBlockedPeriod { BusinessId = business.Id, StartUtc = start, EndUtc = end,
@@ -84,13 +85,15 @@ public sealed class OwnerAvailabilityService(ApplicationDbContext context, Busin
         await context.SaveChangesAsync(ct);
     }
 
-    private static DateTime ParseUtc(string value)
+    private static DateTime LocalToUtc(string value, TimeZoneInfo zone)
     {
-        if ((!value.EndsWith("Z", StringComparison.Ordinal) && !value.EndsWith("+00:00", StringComparison.Ordinal))
-            || !value.Contains('T') || !DateTimeOffset.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed)
-            || parsed.Offset != TimeSpan.Zero || parsed.Year < 2000 || parsed.Year > 2100)
-            throw new RequestException(400, "Use an ISO-8601 UTC timestamp ending in Z or +00:00, between years 2000 and 2100.");
-        return parsed.UtcDateTime;
+        if (!DateTime.TryParseExact(value, "yyyy-MM-dd'T'HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed)
+            || parsed.Year < 2000 || parsed.Year > 2100)
+            throw new RequestException(400, "Use a business-local date/time in yyyy-MM-ddTHH:mm format, between years 2000 and 2100, without a UTC offset.");
+        var local = DateTime.SpecifyKind(parsed, DateTimeKind.Unspecified);
+        if (zone.IsInvalidTime(local) || zone.IsAmbiguousTime(local))
+            throw new RequestException(400, "Closure times must not fall in a skipped or repeated local hour during a daylight-saving transition. Choose an unambiguous time.");
+        return TimeZoneInfo.ConvertTimeToUtc(local, zone);
     }
 
     private static WeeklyHoursResponse MapWeek(IEnumerable<BusinessWorkingHours> hours)
