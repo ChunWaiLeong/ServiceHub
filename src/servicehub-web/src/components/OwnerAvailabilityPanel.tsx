@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import * as api from '../api/availability'
 import { ApiError } from '../api/client'
+import { closureInput } from '../api/closureTimes'
 import { useAuth } from '../auth/AuthContext'
 import WeeklyHoursEditor from './WeeklyHoursEditor'
 
@@ -13,8 +14,10 @@ export default function OwnerAvailabilityPanel({ timeZoneId }: { timeZoneId: str
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [retry, setRetry] = useState(0)
-  const [start, setStart] = useState('')
-  const [end, setEnd] = useState('')
+  const [startDate, setStartDate] = useState('')
+  const [startTime, setStartTime] = useState('')
+  const [endDate, setEndDate] = useState('')
+  const [endTime, setEndTime] = useState('')
   const [reason, setReason] = useState('')
   const [busy, setBusy] = useState(false)
   useEffect(() => {
@@ -40,15 +43,12 @@ export default function OwnerAvailabilityPanel({ timeZoneId }: { timeZoneId: str
   }
   async function addClosure(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setError(''); setNotice('')
-    if (!start || !end || start >= end) { setError('Closure end must be after its start.'); return }
     setBusy(true)
     try {
-      // The input explicitly asks for UTC: never interpret it in the browser's local zone.
-      const created = await authenticated(() => api.createBlockedPeriod({
-        startUtc: new Date(`${start}:00Z`).toISOString(), endUtc: new Date(`${end}:00Z`).toISOString(), reason: reason.trim() || null,
-      }, token!))
+      const input = closureInput(startDate, startTime, endDate, endTime, reason)
+      const created = await authenticated(() => api.createBlockedPeriod(input, token!))
       setPeriods(current => [...current, created].sort((a, b) => a.startUtc.localeCompare(b.startUtc)))
-      setStart(''); setEnd(''); setReason(''); setNotice('Closure added.')
+      setStartDate(''); setStartTime(''); setEndDate(''); setEndTime(''); setReason(''); setNotice('Closure added.')
     } catch (err) { setError(err instanceof Error ? err.message : 'Unable to add closure.') }
     finally { setBusy(false) }
   }
@@ -71,8 +71,10 @@ export default function OwnerAvailabilityPanel({ timeZoneId }: { timeZoneId: str
         {error && <div className="alert alert-danger" role="alert">{error}</div>}
         {notice && <div className="alert alert-success" role="status">{notice}</div>}
         <form onSubmit={addClosure}><fieldset disabled={busy}><div className="row g-3">
-          <div className="col-md-6"><label className="form-label" htmlFor="closure-start">Closure start (UTC)</label><input id="closure-start" className="form-control" type="datetime-local" step={60} required min="2000-01-01T00:00" max="2100-12-31T23:59" value={start} onChange={e => setStart(e.target.value)} /></div>
-          <div className="col-md-6"><label className="form-label" htmlFor="closure-end">Closure end (UTC)</label><input id="closure-end" className="form-control" type="datetime-local" step={60} required min="2000-01-01T00:00" max="2100-12-31T23:59" value={end} onChange={e => setEnd(e.target.value)} /></div>
+          <div className="col-12 col-md-6"><label className="form-label" htmlFor="closure-start-date">Start date (UTC)</label><input id="closure-start-date" className="form-control" type="date" required min="2000-01-01" max="2100-12-31" value={startDate} onChange={e => setStartDate(e.target.value)} /></div>
+          <div className="col-12 col-md-6"><label className="form-label" htmlFor="closure-start-time">Start time (UTC)</label><input id="closure-start-time" className="form-control" type="time" step={60} required value={startTime} onChange={e => setStartTime(e.target.value)} /></div>
+          <div className="col-12 col-md-6"><label className="form-label" htmlFor="closure-end-date">End date (UTC)</label><input id="closure-end-date" className="form-control" type="date" required min="2000-01-01" max="2100-12-31" value={endDate} onChange={e => setEndDate(e.target.value)} /></div>
+          <div className="col-12 col-md-6"><label className="form-label" htmlFor="closure-end-time">End time (UTC)</label><input id="closure-end-time" className="form-control" type="time" step={60} required value={endTime} onChange={e => setEndTime(e.target.value)} /></div>
           <div className="col-12"><label className="form-label" htmlFor="closure-reason">Reason (optional)</label><input id="closure-reason" className="form-control" maxLength={500} value={reason} onChange={e => setReason(e.target.value)} /></div>
         </div><button className="btn btn-outline-primary mt-3">{busy ? 'Saving…' : 'Add closure'}</button></fieldset></form>
         <h4 className="h6 mt-4">Upcoming and ongoing closures</h4>

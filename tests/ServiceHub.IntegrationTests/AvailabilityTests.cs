@@ -197,6 +197,40 @@ public sealed class AvailabilityTests(PostgresFixture database) : IClassFixture<
         Assert.Equal(HttpStatusCode.NotFound, (await owner.DeleteAsync($"/api/owner/business/blocked-periods/{closure.Id}")).StatusCode);
     }
 
+    [PostgresFact]
+    public async Task CustomClosureTimes_RoundTripAndExcludeOnlyOverlappingSlots()
+    {
+        await using var factory = await FactoryAsync();
+        using var owner = await SignedInAsync(factory);
+        var business = await ApiBusinessAsync(owner);
+        await using var context = database.CreateContext();
+        var entity = await context.Businesses.SingleAsync(b => b.Id == business.Id);
+        var service = new Service { BusinessId = business.Id, Name = "Custom closure test", Description = "Test",
+            Price = 35m, Currency = "AUD", DurationMinutes = 30 };
+        context.Services.Add(service);
+        await HoursAsync(context, entity, Monday.DayOfWeek, ("09:00", "17:00"));
+
+        // Sydney daylight time: 01:25–03:40 UTC is 12:25–14:40 business-local.
+        var start = "2030-01-07T01:25:00.000Z";
+        var end = "2030-01-07T03:40:00.000Z";
+        var response = await owner.PostAsJsonAsync("/api/owner/business/blocked-periods", new BlockedPeriodRequest(start, end, null));
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var saved = (await response.Content.ReadFromJsonAsync<BlockedPeriodResponse>())!;
+        Assert.Equal(new DateTime(2030, 1, 7, 1, 25, 0, DateTimeKind.Utc), saved.StartUtc);
+        Assert.Equal(new DateTime(2030, 1, 7, 3, 40, 0, DateTimeKind.Utc), saved.EndUtc);
+        Assert.Null(saved.Reason);
+        using var visitor = factory.CreateClient();
+        var slots = (await visitor.GetFromJsonAsync<AvailabilityResponse>($"/api/businesses/{business.Id}/availability?serviceId={service.Id}&date=2030-01-07"))!;
+        Assert.NotEmpty(slots.Slots);
+        Assert.DoesNotContain(slots.Slots, slot => slot.StartUtc < saved.EndUtc && slot.EndUtc > saved.StartUtc);
+        Assert.Contains(slots.Slots, slot => slot.StartUtc == Utc(Monday, "11:45"));
+        Assert.DoesNotContain(slots.Slots, slot => slot.StartUtc == Utc(Monday, "12:00"));
+        Assert.Contains(slots.Slots, slot => slot.StartUtc == Utc(Monday, "14:45"));
+        Assert.Equal(HttpStatusCode.NoContent, (await owner.DeleteAsync($"/api/owner/business/blocked-periods/{saved.Id}")).StatusCode);
+        var restored = (await visitor.GetFromJsonAsync<AvailabilityResponse>($"/api/businesses/{business.Id}/availability?serviceId={service.Id}&date=2030-01-07"))!;
+        Assert.Contains(restored.Slots, slot => slot.StartUtc == Utc(Monday, "12:00"));
+    }
+
     [PostgresTheory]
     [InlineData("2030-01-07T00:00:00Z", "2030-01-07T00:00:00Z")]
     [InlineData("2030-01-07T01:00:00Z", "2030-01-07T00:00:00Z")]

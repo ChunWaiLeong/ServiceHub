@@ -1,5 +1,7 @@
 # Phase 5: business availability
 
+Temporary closures use separate required start-date, start-time, end-date and end-time controls, with an optional reason. Inputs remain explicitly UTC, preserving the existing API contract; saved closures display in the business time zone. No time is defaulted or fixed. Both frontend and backend reject an end at or before the start. The controls stack on narrow screens. Frontend regression checks run with `pnpm test` from `src/servicehub-web`.
+
 This document records the Phase 5 availability design. Phase 6 now adds booking creation and database concurrency protection; see [bookings](bookings.md). The calculation below remains shared by previews and creation. No schema migration or new package was needed: the Phase 2 working-hours, blocked-period and booking tables are reused.
 
 ## Data and ownership
